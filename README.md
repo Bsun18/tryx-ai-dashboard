@@ -6,22 +6,41 @@
 
 ![仪表盘设计示例（DEMO，非实时数据）](docs/images/dashboard-demo.png)
 
-> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.3.0**。
+> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.4.0**，新增桌面控制台、快捷开关和可选自启动。
 
 ## 下载与部署
 
 **适用条件：** Windows 10/11、Python 3.10 或更新版本（推荐 3.12）、已安装且运行的 KANALI、通过 USB 正常连接的兼容屏幕。当前只接受设备型号 `cm01_se`、分辨率 `2240 × 1080`。实体测试覆盖 Windows 11 + 一台 PANORAMA SE；其他固件仍需验证。
 
-1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.3.0.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
+1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.4.0.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
 2. 从 [Python 官网](https://www.python.org/downloads/windows/) 安装 Python，安装时启用 **Add python.exe to PATH**。已安装者可跳过。
 3. 打开 KANALI，确认原厂屏幕正常工作。
-4. 双击 `setup.cmd`。它会创建项目独立的 Python 环境、安装依赖、识别屏幕和电脑硬件。首次安装需要联网访问 PyPI。
-5. 双击 `start.cmd`，等待约 10–65 秒。仪表盘出现在实体屏幕后，启动窗口会关闭。
-6. 要返回 KANALI 的画面，双击 `stop.cmd`。
+4. 双击 `setup.cmd`。它会创建项目独立的 Python 环境、安装依赖、识别屏幕和电脑硬件，并创建桌面入口。首次安装需要联网访问 PyPI。
+5. 打开桌面的 **TRYX 仪表盘控制台**，点击“启动仪表盘”。也可运行 `control.cmd`。首次读取硬件可能需要约 10–65 秒。
+6. 要返回 KANALI 的画面，点击“关闭 · 返回原画面”。桌面 **TRYX 仪表盘开关** 可直接双击切换；原 `start.cmd` / `stop.cmd` 仍可使用。
 
-发布包已包含本项目编译的 `renderer/renderer.jar`，普通使用者**不需要安装 Java 或 Android SDK**。项目不会设置开机启动，也不会安装 APK、刷写固件或修改风扇曲线。
+发布包已包含本项目编译的 `renderer/renderer.jar`，普通使用者**不需要安装 Java 或 Android SDK**。Python 需包含标准 Tcl/Tk 组件。项目不安装 APK、刷写固件或修改风扇曲线。
+
+### 自动启动与日常开关
+
+在控制台勾选 **登录 Windows 后自动启动**，以后登录当前用户时会静默启动。取消勾选即可禁用；安装时默认不启用此选项。它是用户登录启动项，不是登录前的系统服务，不需要保存密码。
+
+- 关闭控制台窗口不影响仪表盘运行。
+- 手动关闭仪表盘后，本次登录不会被后台监督程序重新打开；仍勾选自启动时，下次登录会恢复。
+- USB 设备枚举较慢时采集器会等待并重试，不会因为开机时尚未发现屏幕而直接退出。
+- 已有且可访问的 `StartKANALI` 厂商任务会被复用；只有任务指向实际存在的 `KANALI.exe` 才会调用，不新增高权限任务。没有此任务时，请在 KANALI 自己的设置中启用自启动，或手动打开 KANALI。
+- 自启动项为当前用户启动文件夹中的 `TRYX AI Dashboard.lnk`。应用也会识别任务管理器中对它的禁用。
+- 升级建议解压到原项目目录并保留 `config.json`。若改用另一个目录，先在旧控制台取消自启动、停止旧实例并删除旧桌面快捷方式，再在新目录安装；不同目录不会互相接管快捷方式或进程。
 
 首次配置完成后不再需要联网下载依赖，运行时不上传遥测数据。保持 KANALI 运行，以提供 CPU 温度、功耗和风扇数据。安装位置变化、重装 Python 或迁移到另一台电脑时，应使用干净的发布包重新运行 `setup.cmd`，不要复制旧电脑的 `.venv` 和 `runtime`。
+
+## TRYX 其他屏幕能否使用
+
+**目前正式支持的配置仍是 `cm01_se`、`2240×1080`，实体确认来自 PANORAMA SE 360。** 普通 PANORAMA / ARGB 的规格相近，具有适配潜力，但当前版本不会直接对其部署。PANORAMA SE V2、STAGE、TURRIS 等尚未验证，不能因使用 KANALI 就认定其通信协议、Android 权限和屏幕布局一致。详细型号比较及官方来源见 [兼容性说明](docs/compatibility.md#同品牌其他屏幕)。
+
+其他型号可运行 `diagnose-screen.cmd`，生成 `runtime/screen-diagnostic.json`：仅查询 ADB 型号、Android 版本和分辨率，不上传 DEX、建立转发、截图或修改画面。报告不包含 ADB 序列号、用户名或本机路径。若 `setup.cmd` 在型号检查阶段失败，已经创建的 Python 环境仍可运行此诊断。
+
+`matches_current_profile` 只表示型号/分辨率符合当前配置，不代表已经验证该固件的绘图权限。报告可用于后续适配；暂无 ADB 接口的屏幕需要另一套传输方案。
 
 ## 自动读取哪些参数
 
@@ -77,7 +96,8 @@
 - **温度、功耗或风扇显示 `—`：** KANALI 未持续提供对应传感器数据，或固件日志格式与已测试版本不同。保持 KANALI 运行；程序不安装额外传感器驱动。
 - **AMD / Intel 显卡信息不完整：** 当前只为 NVIDIA 实现了 NVML 完整采集路径。KANALI 回退为部分支持，见 [兼容性说明](docs/compatibility.md)。
 - **提示端口 18765 被占用：** 先停止旧目录中的仪表盘，再启动新版本；同一台电脑一次运行一个实例。程序不会停止另一份安装目录的采集器。
-- **启动未确认：** 查看 `runtime/launcher-error.log`、`runtime/collector.log` 和 `runtime/renderer.log`。日志可能包含本机信息，提交 issue 前先检查并删去序列号、用户名及路径。
+- **启动后显示等待：** 检查 `runtime/usb-status.json`；无设备、多设备歧义或不支持的型号会保留说明并持续等待，不会强行部署。
+- **启动未确认：** 查看 `runtime/launcher-error.log`、`runtime/collector.log` 和 `runtime/renderer.log`。控制台错误另见 `runtime/control-error.log`。日志可能包含本机信息，提交 issue 前先检查并删去序列号、用户名及路径。
 - **USB 断开或休眠：** 数据失效后显示 `NO DATA`，约 15 秒释放叠加画面；连接恢复后后台采集器会尝试重建。此路径仍需在不同电脑上验证。
 - **想更换监控磁盘/网卡：** 修改本地配置后重启采集器。磁盘清单与型号在启动时读取，USB 网卡等新增设备也建议重启重新识别。
 

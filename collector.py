@@ -29,11 +29,7 @@ processes = []
 STREAM_ID = uuid.uuid4().hex
 
 def prepare():
-    global ADB_BASE, INVENTORY, SELECTED_DISK
-    executable, serial = connect_screen(CONFIG)
-    ADB_BASE = [executable, '-s', serial]
-    RUNTIME.mkdir(exist_ok=True)
-    (RUNTIME/'connection.json').write_text(json.dumps({'serial':serial}),encoding='utf-8')
+    global INVENTORY, SELECTED_DISK
     try:
         INVENTORY = windows_inventory()
     except (OSError, ValueError, subprocess.SubprocessError) as error:
@@ -105,6 +101,9 @@ def vendor_loop():
     while not stop.is_set():
         p=None
         try:
+            if not ADB_BASE:
+                stop.wait(3)
+                continue
             p=subprocess.Popen(ADB_BASE+['logcat','-T','1','-v','raw','DataConvert:D','SerialMsgReceiverHandler:D','*:S'],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,encoding='utf-8',errors='replace',creationflags=FLAGS)
             processes.append(p)
             for line in p.stdout:
@@ -207,10 +206,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self,*args):pass
 
 def usb_loop():
+    global ADB_BASE
     renderer=None
     claimed=False
     while not stop.is_set():
         try:
+            if not ADB_BASE:
+                executable, serial = connect_screen(CONFIG)
+                ADB_BASE = [executable, '-s', serial]
+                (RUNTIME/'connection.json').write_text(json.dumps({'serial':serial}),encoding='utf-8')
             state=adb('get-state',timeout=5)
             if state.returncode==0 and state.stdout.strip()=='device':
                 # The loopback port is exclusively owned by this collector. Clear
@@ -230,15 +234,20 @@ def usb_loop():
                         with (RUNTIME/'renderer.log').open('w',encoding='utf-8') as log:
                             renderer=subprocess.Popen(ADB_BASE+['shell','CLASSPATH=/data/local/tmp/ai-telemetry.jar app_process / --nice-name=ai-telemetry local.aimonitor.dashboard.ScreenRenderer'],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,creationflags=FLAGS)
                         processes.append(renderer)
-        except (OSError,subprocess.TimeoutExpired):pass
+                (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':True,'message':''}),encoding='utf-8')
+            else:
+                (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':False,'message':'Waiting for the selected USB screen.'}),encoding='utf-8')
+        except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
+            (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':False,'message':str(error)}),encoding='utf-8')
         for p in list(processes):
             if p.poll() is not None:processes.remove(p)
         stop.wait(8)
 
 def main():
     server=http.server.ThreadingHTTPServer(('127.0.0.1',PORT),Handler)
-    prepare()
+    RUNTIME.mkdir(exist_ok=True)
     pid=RUNTIME/'collector.pid';pid.write_text(str(os.getpid()))
+    prepare()
     for target in [sampler,vendor_loop,usb_loop]:threading.Thread(target=target,daemon=True).start()
     print('AI Telemetry: USB device linked; loopback port',PORT,flush=True)
     try:server.serve_forever(poll_interval=.5)

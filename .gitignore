@@ -8,6 +8,7 @@
 *.py[cod]
 *.log
 *.pid
+*.lnk
 *.exe
 *.dll
 *.zip

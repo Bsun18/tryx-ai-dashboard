@@ -12,6 +12,7 @@ import urllib.request
 import psutil
 from settings import ROOT, RUNTIME, PORT, FLAGS, connect_screen, find_adb, load_config, run_adb, windows_inventory
 from telemetry_math import select_disk, storage_limits
+from windows_integration import action_lock, autostart_enabled, ensure_kanali, manage_shortcuts
 
 
 def current():
@@ -62,14 +63,17 @@ def start():
             raise RuntimeError(f'Port {PORT} is already in use. Stop the other dashboard installation before starting this one.')
         if not (ROOT/'renderer'/'renderer.jar').is_file():
             raise FileNotFoundError('renderer/renderer.jar missing. Run scripts/build_renderer.py or download a complete release.')
-        connect_screen(load_config())
         RUNTIME.mkdir(exist_ok=True)
         (RUNTIME/'renderer.log').write_text('', encoding='utf-8')
+        for name in ['connection.json','usb-status.json']:
+            (RUNTIME/name).unlink(missing_ok=True)
         executable = Path(sys.executable).with_name('pythonw.exe')
         if not executable.exists(): executable = Path(sys.executable)
         with (RUNTIME/'collector.log').open('w', encoding='utf-8') as log:
-            subprocess.Popen([str(executable), str(ROOT/'collector.py')], cwd=ROOT, stdin=subprocess.DEVNULL,
+            process = subprocess.Popen([str(executable), str(ROOT/'collector.py')], cwd=ROOT, stdin=subprocess.DEVNULL,
                              stdout=log, stderr=subprocess.STDOUT, creationflags=FLAGS | subprocess.CREATE_NEW_PROCESS_GROUP)
+        (RUNTIME/'collector.pid').write_text(str(process.pid),encoding='ascii')
+    ensure_kanali()
     deadline = time.monotonic() + 65
     while time.monotonic() < deadline:
         time.sleep(.5)
@@ -78,16 +82,20 @@ def start():
         if owned and data.get('collector_pid') == owned.pid and data.get('sample_age_s', 999) is not None and data.get('sample_age_s', 999) < 4:
             log = RUNTIME/'renderer.log'
             if log.exists() and 'AI_TELEMETRY_PORTABLE_SURFACE_READY' in log.read_text(encoding='utf-8', errors='replace'):
-                print('Dashboard running. Live data is updating on the cooler screen.')
-                return
-    raise RuntimeError('Startup was not confirmed. See runtime/collector.log and runtime/renderer.log.')
+                return 'running'
+        if not current(): raise RuntimeError('Collector exited. See runtime/collector.log.')
+        # Fresh host data with no screen is a valid waiting state. The collector
+        # keeps discovering the USB device, even after this launcher exits.
+        if owned and data.get('collector_pid') == owned.pid and not (RUNTIME/'connection.json').exists():
+            return 'waiting'
+    if current(): return 'waiting'
+    raise RuntimeError('Startup failed. See runtime/collector.log.')
 
 
 def stop_dashboard():
     process = current()
     if not process:
-        print('No collector owned by this installation is running.')
-        return
+        return 'stopped'
     connection_path = RUNTIME/'connection.json'
     connection = json.loads(connection_path.read_text(encoding='utf-8')) if connection_path.exists() else {}
     children = process.children(recursive=True)
@@ -95,33 +103,61 @@ def stop_dashboard():
     for child in children:
         try: child.terminate()
         except psutil.Error: pass
-    psutil.wait_procs([process] + children, timeout=5)
+    _, alive = psutil.wait_procs([process] + children, timeout=5)
+    for child in alive:
+        try: child.kill()
+        except psutil.Error: pass
     serial = connection.get('serial')
     if serial:
-        executable = find_adb(load_config())
-        result = run_adb(executable, '-s', serial, 'shell', 'pidof', 'ai-telemetry')
-        for value in result.stdout.split():
-            if not value.isdigit(): continue
-            identity = run_adb(executable, '-s', serial, 'shell', 'cat', '/proc/'+value+'/cmdline').stdout
-            if identity.split('\x00')[0] == 'ai-telemetry':
-                run_adb(executable, '-s', serial, 'shell', 'kill', '-TERM', value)
-        run_adb(executable, '-s', serial, 'reverse', '--remove', 'tcp:'+str(PORT))
-    print('Dashboard stopped. The original KANALI display is visible when USB is connected.')
+        try:
+            executable = find_adb(load_config())
+            result = run_adb(executable, '-s', serial, 'shell', 'pidof', 'ai-telemetry')
+            for value in result.stdout.split():
+                if not value.isdigit(): continue
+                identity = run_adb(executable, '-s', serial, 'shell', 'cat', '/proc/'+value+'/cmdline').stdout
+                if identity.split('\x00')[0] == 'ai-telemetry':
+                    run_adb(executable, '-s', serial, 'shell', 'kill', '-TERM', value)
+            run_adb(executable, '-s', serial, 'reverse', '--remove', 'tcp:'+str(PORT))
+        except (OSError,subprocess.SubprocessError): pass
+    return 'stopped'
+
+
+def status():
+    process=current()
+    data=metrics() if process else {}
+    owned=bool(process and data.get('collector_pid')==process.pid)
+    age=data.get('sample_age_s') if owned else None
+    screen=False
+    if owned:
+        try:
+            connection=json.loads((RUNTIME/'connection.json').read_text(encoding='utf-8'))
+            screen=bool(run_adb(find_adb(load_config()),'-s',connection['serial'],'shell','pidof','ai-telemetry',timeout=3).stdout.strip())
+        except (OSError,ValueError,KeyError,subprocess.SubprocessError): pass
+    return {'running':bool(process),'live':bool(owned and screen and isinstance(age,(int,float)) and age<4),
+            'screen':screen,'sample_age_s':age,'cpu_temp_c':data.get('cpu_temp_c') if owned else None,
+            'autostart':autostart_enabled()}
+
+
+def perform(command):
+    with action_lock():
+        if command=='toggle': command='stop' if current() else 'start'
+        return stop_dashboard() if command=='stop' else start()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['configure', 'start', 'stop', 'status'], nargs='?', default='start')
+    parser.add_argument('command', choices=['configure','start','stop','toggle','autostart','status','install-shortcuts','enable-autostart','disable-autostart'], nargs='?', default='start')
     args = parser.parse_args()
     if os.name != 'nt': raise RuntimeError('The collector requires Windows 10/11.')
     if args.command == 'configure': configure()
-    elif args.command == 'start': start()
-    elif args.command == 'stop': stop_dashboard()
+    elif args.command in {'start','stop','toggle','autostart'}:
+        result=perform(args.command)
+        if sys.stdout: print(result)
+    elif args.command=='status':
+        if sys.stdout: print(json.dumps(status(),indent=2))
     else:
-        process = current()
-        data = metrics()
-        owned = bool(process and data.get('collector_pid') == process.pid)
-        print(json.dumps({'running': owned, 'sample_age_s': data.get('sample_age_s') if owned else None}, indent=2))
+        result=manage_shortcuts({'install-shortcuts':'Install','enable-autostart':'Enable','disable-autostart':'Disable'}[args.command])
+        if sys.stdout: print(result)
 
 
 if __name__ == '__main__':
@@ -129,4 +165,5 @@ if __name__ == '__main__':
     except Exception as error:
         RUNTIME.mkdir(exist_ok=True)
         (RUNTIME/'launcher-error.log').write_text(str(error), encoding='utf-8')
-        print(str(error)); sys.exit(1)
+        if sys.stdout: print(str(error))
+        sys.exit(1)

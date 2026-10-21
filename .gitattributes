@@ -8,3 +8,4 @@
 *.cmd text eol=crlf
 *.png binary
 *.jar binary
+*.ico binary
