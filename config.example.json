@@ -1,0 +1,12 @@
+{
+  "device_serial": null,
+  "adb_path": null,
+  "gpu_index": 0,
+  "disk_index": null,
+  "network_interface": null,
+  "gpu_label": null,
+  "cpu_label": null,
+  "storage_label": null,
+  "storage_read_peak_mb_s": null,
+  "storage_write_peak_mb_s": null
+}
