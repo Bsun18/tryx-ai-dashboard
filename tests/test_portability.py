@@ -94,9 +94,9 @@ class Configuration(unittest.TestCase):
                 self.load({'screen_brightness_percent': value})
 
     def test_sample_interval_limits(self):
-        for value in (0.5, 1, 5):
+        for value in (0.5, 1, 2):
             self.assertEqual(self.load({'sample_interval_s': value})['sample_interval_s'], value)
-        for value in (None, True, 0, 0.1, 6, float('nan'), float('inf'), '0.5'):
+        for value in (None, True, 0, 0.1, 2.1, 5, 6, float('nan'), float('inf'), '0.5'):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 self.load({'sample_interval_s': value})
 

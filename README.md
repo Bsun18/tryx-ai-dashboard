@@ -22,13 +22,13 @@
 
 ![仪表盘设计示例（DEMO，非实时数据）](docs/images/dashboard-demo.png)
 
-> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.5.1**，默认独立采集，日常运行无需打开 KANALI；保留桌面开关与登录自启。
+> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.5.2**，默认独立采集，日常运行无需打开 KANALI；保留桌面开关与登录自启。
 
 ## 下载与部署
 
 **适用条件：** Windows 10/11、Python 3.10 或更新版本（推荐 3.12）、64 位系统、.NET Framework 4.7.2+、通过 USB 正常连接的兼容屏幕。当前只接受设备型号 `cm01_se`、分辨率 `2240 × 1080`。实体测试覆盖 Windows 11 + 一台 PANORAMA SE；其他固件仍需验证。
 
-1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.5.1.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
+1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.5.2.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
 2. 从 [Python 官网](https://www.python.org/downloads/windows/) 安装 Python，安装时启用 **Add python.exe to PATH**。已安装者可跳过。
 3. 确认屏幕 USB 接线和驱动正常。本机沿用已安装的 USB 设备驱动，尚未验证完全未装过厂商软件的全新系统。
 4. 双击 `setup.cmd` 准备 Python 环境和桌面入口，再运行 **`setup-native.cmd`**，同意一次管理员安装。它下载并校验官方 ADB、LibreHardwareMonitor 采集库和签名 PawnIO 驱动，安装按需传感器任务。详见 [独立模式安装说明](docs/native-mode.md)。
@@ -104,7 +104,7 @@
 | 字段 | 用途 |
 | --- | --- |
 | `screen_brightness_percent` | 屏幕亮度，1–100 的整数，默认 80；修改后重启仪表盘 |
-| `sample_interval_s` | 负载、内存与传输采样间隔，0.5–5 秒，默认 1；设为 0.5 可提高更新频率。独立温度/功耗/风扇采集仍约 1 秒 |
+| `sample_interval_s` | 负载、内存与传输采样间隔，0.5–2 秒，默认 1；设为 0.5 可提高更新频率。独立温度/功耗/风扇采集仍约 1 秒 |
 | `device_serial` | 多台兼容屏幕时，指定目标 ADB 序列号；仅保存在本地 |
 | `adb_path` | 指定自己的 `adb.exe` 完整路径，例如 `D:/Android/platform-tools/adb.exe` |
 | `gpu_index` | NVIDIA NVML 显卡索引，从 0 开始；与 LHM 硬件 ID 不同 |
@@ -121,7 +121,7 @@
 
 - **提示找不到 ADB：** 优先使用项目 `tools/platform-tools/adb.exe`、`tools/adb.exe`、PATH 或 Android SDK 的 ADB；独立模式可运行 `setup-native.cmd` 安装官方 ADB。也可从 [Google 官方 Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 下载，接受其条款后解压到项目 `tools` 目录。不要从不明网站下载 DLL。
 - **未发现兼容屏幕：** 检查 USB 接线、设备驱动及固件，运行 `diagnose-screen.cmd` 查看只读报告。其他型号/分辨率会被拒绝，本版本不能保证兼容 PANORAMA 非 SE 或其他品牌屏幕。
-- **画面存在但黑屏或很暗：** v0.5.1 增加随渲染进程释放的系统亮度窗口，默认 80%，解决已验证固件首页的零亮度覆盖；无需额外授予普通悬浮窗权限。其他固件仍需验证，详见 [亮度说明](docs/native-mode.md#屏幕亮度)。
+- **画面存在但黑屏或很暗：** v0.5.2 增加随渲染进程释放的系统亮度窗口，默认 80%，解决已验证固件首页的零亮度覆盖；无需额外授予普通悬浮窗权限。其他固件仍需验证，详见 [亮度说明](docs/native-mode.md#屏幕亮度)。
 - **温度、功耗或风扇显示 `—`：** 先完成 `setup-native.cmd`，检查 ProgramData 中的传感器快照是否更新。某些主板传感器可能不受支持，泛称风扇需手动匹配；见 [独立模式说明](docs/native-mode.md)。
 - **AMD / Intel 显卡信息不完整：** 当前 NVIDIA 使用 NVML 完整采集路径，LHM 为其他 GPU 提供可用的部分指标，见 [兼容性说明](docs/compatibility.md)。
 - **提示端口 18765 被占用：** 先停止旧目录中的仪表盘，再启动新版本；同一台电脑一次运行一个实例。程序不会停止另一份安装目录的采集器。

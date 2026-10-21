@@ -34,8 +34,8 @@ def load_config(path=None):
     if isinstance(brightness, bool) or not isinstance(brightness, int) or not 1 <= brightness <= 100:
         raise ValueError('screen_brightness_percent must be an integer from 1 to 100')
     interval = result['sample_interval_s']
-    if isinstance(interval, bool) or not isinstance(interval, (int, float)) or not math.isfinite(interval) or not 0.5 <= interval <= 5:
-        raise ValueError('sample_interval_s must be a number from 0.5 to 5')
+    if isinstance(interval, bool) or not isinstance(interval, (int, float)) or not math.isfinite(interval) or not 0.5 <= interval <= 2:
+        raise ValueError('sample_interval_s must be a number from 0.5 to 2')
     for key, value in result.items():
         if key in {'screen_brightness_percent', 'sample_interval_s'}: continue
         if value is None:
