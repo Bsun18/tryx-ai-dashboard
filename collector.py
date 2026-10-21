@@ -167,7 +167,7 @@ def sampler():
     prev_disks=psutil.disk_io_counters(perdisk=True,nowrap=False)
     prev_net=psutil.net_io_counters(pernic=True,nowrap=False)
     then=time.monotonic();seq=0
-    while not stop.wait(1):
+    while not stop.wait(float(CONFIG.get('sample_interval_s', 1))):
         now=time.monotonic();elapsed=now-then
         try:
             mem=psutil.virtual_memory();disks=psutil.disk_io_counters(perdisk=True,nowrap=False);net=psutil.net_io_counters(pernic=True,nowrap=False)
@@ -252,7 +252,7 @@ def usb_loop():
                     transfer=adb('push',str(ROOT/'renderer'/'renderer.jar'),'/data/local/tmp/ai-telemetry.jar')
                     if transfer.returncode==0:
                         with (RUNTIME/'renderer.log').open('w',encoding='utf-8') as log:
-                            renderer=subprocess.Popen(ADB_BASE+['shell','CLASSPATH=/data/local/tmp/ai-telemetry.jar app_process / --nice-name=ai-telemetry local.aimonitor.dashboard.ScreenRenderer'],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,creationflags=FLAGS)
+                            renderer=subprocess.Popen(ADB_BASE+['shell','CLASSPATH=/data/local/tmp/ai-telemetry.jar app_process / --nice-name=ai-telemetry local.aimonitor.dashboard.ScreenRenderer 0 '+str(max(1,min(100,int(CONFIG.get('screen_brightness_percent',80)))))],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,creationflags=FLAGS)
                         processes.append(renderer)
                 (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':True,'message':''}),encoding='utf-8')
             else:

@@ -61,7 +61,10 @@ def map_sensors(payload, config, now_ms):
                   sensor_age_s=None, cpu_temp_sensor=None, cpu_power_sensor=None, fan_sensor=None)
     if not fresh_payload(payload, now_ms): return result
     result['sensor_age_s'] = (now_ms-payload['tick_ms'])/1000
-    sensors = [s for s in payload['sensors'] if isinstance(s, dict)]
+    sensors = [s for s in payload['sensors'] if isinstance(s, dict) and
+               isinstance(s.get('sample_tick_ms', payload['tick_ms']), int) and
+               not isinstance(s.get('sample_tick_ms', payload['tick_ms']), bool) and
+               0 <= now_ms-s.get('sample_tick_ms', payload['tick_ms']) < MAX_AGE_MS]
     cpus = [s for s in sensors if s.get('hardware_type') == 'Cpu']
     cpu_ids = sorted({s.get('hardware_id', '') for s in cpus})
     cpu_id = config.get('cpu_hardware_id') or (cpu_ids[0] if len(cpu_ids) == 1 else None)

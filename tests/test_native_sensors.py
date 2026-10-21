@@ -45,6 +45,16 @@ class NativeTelemetry(unittest.TestCase):
         self.payload['sensors'][4]['value'] = 0
         self.assertEqual(native.map_sensors(self.payload, {}, 100100)['fan_rpm'], 0)
 
+    def test_fresh_file_does_not_make_old_sensor_values_fresh(self):
+        self.payload['sensors'][0]['sample_tick_ms'] = 95000
+        result = native.map_sensors(self.payload, {}, 100100)
+        self.assertIsNone(result['cpu_temp_c'])
+        self.assertEqual(result['cpu_power_w'], 61)
+        self.assertEqual(result['fan_rpm'], 1200)
+        for stamp in (100200, None, True, '100000'):
+            self.payload['sensors'][0]['sample_tick_ms'] = stamp
+            self.assertIsNone(native.map_sensors(self.payload, {}, 100100)['cpu_temp_c'])
+
     def test_unknown_fan_name_is_not_guessed(self):
         self.payload['sensors'][4]['name'] = 'Fan #1'
         self.assertIsNone(native.map_sensors(self.payload, {}, 100100)['fan_rpm'])

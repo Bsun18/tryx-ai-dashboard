@@ -86,6 +86,20 @@ class Configuration(unittest.TestCase):
                       {'unknown': 1}, {'device_serial': '\n'}, []]:
             with self.subTest(value=value), self.assertRaises(ValueError): self.load(value)
 
+    def test_brightness_limits(self):
+        for value in (1, 80, 100):
+            self.assertEqual(self.load({'screen_brightness_percent': value})['screen_brightness_percent'], value)
+        for value in (None, True, 0, 101, 50.5, '80; reboot'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.load({'screen_brightness_percent': value})
+
+    def test_sample_interval_limits(self):
+        for value in (0.5, 1, 5):
+            self.assertEqual(self.load({'sample_interval_s': value})['sample_interval_s'], value)
+        for value in (None, True, 0, 0.1, 6, float('nan'), float('inf'), '0.5'):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                self.load({'sample_interval_s': value})
+
     def test_device_discovery_ignores_phones_offline_and_unauthorized(self):
         devices = settings.parse_devices('List of devices attached\nPHONE device model:Pixel\n'
             'EXAMPLE_A device product:test model:cm01_se transport_id:2\n'

@@ -2,17 +2,33 @@
 
 面向 **TRYX 展域 SE 360 / PANORAMA SE** 的本机硬件仪表盘。通过 USB 将 Windows 实时指标显示到散热器自带屏幕上，适合观察本地 AI 运行时的计算负载、内存容量与数据传输。
 
+## 项目简介
+
+将水冷头上的副屏变成一块面向本地 AI、渲染和日常计算的硬件监控仪表盘：在运行模型时，直接查看计算负载、显存和内存占用，以及 PCIe、SSD、网络的数据传输，帮助观察任务在等待计算、容量还是传输。
+
+**Windows 采集 · USB 实时传输 · Android 原生绘图 · 无需运行 KANALI**
+
+- **适配自己的电脑：** 自动发现 CPU、GPU、内存、磁盘和网卡；多卡、多盘可手动选择。
+- **适合小屏阅读：** 汽车仪表盘式双负载表、温度条、功耗与容量条、传输曲线及带宽占比。
+- **便捷运行：** 桌面启动/关闭，可选登录自启；屏幕亮度可配置，默认 80%。
+- **数据留在本机：** 运行时只通过本机回环接口和 USB 传输，无账号、云端遥测或模型服务。
+- **明确支持范围：** 已验证 TRYX PANORAMA SE 360 的 `cm01_se / 2240×1080` 配置；其他品牌或同品牌型号需要单独适配。
+
+这是硬件可视化工具，“AI”指应用场景。它不运行 AI 模型，不做告警或自动调节，也不把单个利用率直接当作瓶颈结论。
+
+[下载最新版](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) · [安装独立模式](docs/native-mode.md) · [指标解释](docs/metrics.md) · [兼容性](docs/compatibility.md) · [更新记录](CHANGELOG.md)
+
 双主表盘显示 GPU / CPU 负载，下方显示温度；侧栏显示显存、内存与功耗；底部保留传输曲线，并用条形表显示相对于带宽参照值的占比。只做可视化监控，不含 AI 模型、告警或自动调节功能。
 
 ![仪表盘设计示例（DEMO，非实时数据）](docs/images/dashboard-demo.png)
 
-> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.5.0**，默认独立采集，日常运行无需打开 KANALI；保留桌面开关与登录自启。
+> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.5.1**，默认独立采集，日常运行无需打开 KANALI；保留桌面开关与登录自启。
 
 ## 下载与部署
 
 **适用条件：** Windows 10/11、Python 3.10 或更新版本（推荐 3.12）、64 位系统、.NET Framework 4.7.2+、通过 USB 正常连接的兼容屏幕。当前只接受设备型号 `cm01_se`、分辨率 `2240 × 1080`。实体测试覆盖 Windows 11 + 一台 PANORAMA SE；其他固件仍需验证。
 
-1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.5.0.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
+1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.5.1.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
 2. 从 [Python 官网](https://www.python.org/downloads/windows/) 安装 Python，安装时启用 **Add python.exe to PATH**。已安装者可跳过。
 3. 确认屏幕 USB 接线和驱动正常。本机沿用已安装的 USB 设备驱动，尚未验证完全未装过厂商软件的全新系统。
 4. 双击 `setup.cmd` 准备 Python 环境和桌面入口，再运行 **`setup-native.cmd`**，同意一次管理员安装。它下载并校验官方 ADB、LibreHardwareMonitor 采集库和签名 PawnIO 驱动，安装按需传感器任务。详见 [独立模式安装说明](docs/native-mode.md)。
@@ -79,12 +95,16 @@
   "cpu_temp_sensor_id": null,
   "cpu_power_sensor_id": null,
   "fan_sensor_id": null,
-  "native_gpu_hardware_id": null
+  "native_gpu_hardware_id": null,
+  "screen_brightness_percent": 80,
+  "sample_interval_s": 1
 }
 ```
 
 | 字段 | 用途 |
 | --- | --- |
+| `screen_brightness_percent` | 屏幕亮度，1–100 的整数，默认 80；修改后重启仪表盘 |
+| `sample_interval_s` | 负载、内存与传输采样间隔，0.5–5 秒，默认 1；设为 0.5 可提高更新频率。独立温度/功耗/风扇采集仍约 1 秒 |
 | `device_serial` | 多台兼容屏幕时，指定目标 ADB 序列号；仅保存在本地 |
 | `adb_path` | 指定自己的 `adb.exe` 完整路径，例如 `D:/Android/platform-tools/adb.exe` |
 | `gpu_index` | NVIDIA NVML 显卡索引，从 0 开始；与 LHM 硬件 ID 不同 |
@@ -101,6 +121,7 @@
 
 - **提示找不到 ADB：** 优先使用项目 `tools/platform-tools/adb.exe`、`tools/adb.exe`、PATH 或 Android SDK 的 ADB；独立模式可运行 `setup-native.cmd` 安装官方 ADB。也可从 [Google 官方 Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 下载，接受其条款后解压到项目 `tools` 目录。不要从不明网站下载 DLL。
 - **未发现兼容屏幕：** 检查 USB 接线、设备驱动及固件，运行 `diagnose-screen.cmd` 查看只读报告。其他型号/分辨率会被拒绝，本版本不能保证兼容 PANORAMA 非 SE 或其他品牌屏幕。
+- **画面存在但黑屏或很暗：** v0.5.1 增加随渲染进程释放的系统亮度窗口，默认 80%，解决已验证固件首页的零亮度覆盖；无需额外授予普通悬浮窗权限。其他固件仍需验证，详见 [亮度说明](docs/native-mode.md#屏幕亮度)。
 - **温度、功耗或风扇显示 `—`：** 先完成 `setup-native.cmd`，检查 ProgramData 中的传感器快照是否更新。某些主板传感器可能不受支持，泛称风扇需手动匹配；见 [独立模式说明](docs/native-mode.md)。
 - **AMD / Intel 显卡信息不完整：** 当前 NVIDIA 使用 NVML 完整采集路径，LHM 为其他 GPU 提供可用的部分指标，见 [兼容性说明](docs/compatibility.md)。
 - **提示端口 18765 被占用：** 先停止旧目录中的仪表盘，再启动新版本；同一台电脑一次运行一个实例。程序不会停止另一份安装目录的采集器。

@@ -67,7 +67,17 @@ try {
         $destination = Join-Path $taskProgram $entry.Name
         Assert-NoReparse $destination
         if (-not (Test-Path -LiteralPath $destination) -or (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ine $entry.Value) {
-            Copy-Item -LiteralPath (Join-Path $taskPayload $entry.Name) -Destination $destination -Force
+            # Process termination and antivirus scans can briefly retain a file handle.
+            # Retry the same validated destination; never continue with a partial upgrade.
+            for ($taskAttempt = 0; ; $taskAttempt++) {
+                try {
+                    Copy-Item -LiteralPath (Join-Path $taskPayload $entry.Name) -Destination $destination -Force
+                    break
+                } catch [IO.IOException] {
+                    if ($taskAttempt -ge 19) { throw }
+                    Start-Sleep -Milliseconds 500
+                }
+            }
         }
     }
     $taskPawn = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO' -ErrorAction SilentlyContinue

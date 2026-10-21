@@ -14,5 +14,7 @@
   "cpu_temp_sensor_id": null,
   "cpu_power_sensor_id": null,
   "fan_sensor_id": null,
-  "native_gpu_hardware_id": null
+  "native_gpu_hardware_id": null,
+  "screen_brightness_percent": 80,
+  "sample_interval_s": 1
 }

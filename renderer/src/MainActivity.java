@@ -56,8 +56,9 @@ public class MainActivity extends Activity {
         final Typeface medium=Typeface.create("sans-serif-medium",Typeface.NORMAL);
         final Typeface bold=Typeface.create("sans-serif",Typeface.BOLD);
         final DashPathEffect dashed=new DashPathEffect(new float[]{13,7},0);
-        final float[][] histories = new float[4][96];
-        final double[] times = new double[96];
+        static final int HISTORY_CAPACITY = 192; // 90 seconds at the supported 0.5-second interval.
+        final float[][] histories = new float[4][HISTORY_CAPACITY];
+        final double[] times = new double[HISTORY_CAPACITY];
         int count=0;
         long lastSeq=-1;
         String stream="";
@@ -246,9 +247,9 @@ public class MainActivity extends Activity {
             double sample=d.optDouble("sample_monotonic_s",SystemClock.elapsedRealtime()/1000.0);
             timeNow=sample+d.optDouble("sample_age_s",0)+age/1000.0;
             if(seq==lastSeq)return;
-            if(count==96) {
-                System.arraycopy(times,1,times,0,95);
-                for(float[] values:histories)System.arraycopy(values,1,values,0,95);
+            if(count==HISTORY_CAPACITY) {
+                System.arraycopy(times,1,times,0,HISTORY_CAPACITY-1);
+                for(float[] values:histories)System.arraycopy(values,1,values,0,HISTORY_CAPACITY-1);
             } else count++;
             times[count-1]=sample;
             histories[0][count-1]=val("pcie_rx_mb_s"); histories[1][count-1]=val("pcie_tx_mb_s");

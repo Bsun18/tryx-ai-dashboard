@@ -49,6 +49,14 @@ CPU 温度优先取处理器的 Tctl/Tdie 或 Package 温度，CPU 功耗取 Pac
 
 ## 关闭与卸载
 
+### 屏幕亮度
+
+`screen_brightness_percent` 默认 80，允许 1–100 的整数；修改 `config.json` 后停止并重新启动仪表盘。
+
+PANORAMA SE 固件首页可能把亮度覆盖为 0 或约 20%，即使仪表盘画面仍在更新。渲染进程现在通过一个透明、不接收输入的 1×1 系统窗口请求指定亮度并保持屏幕点亮。该窗口使用已验证固件中 shell 原有的 `INTERNAL_SYSTEM_WINDOW` 权限，不更改 app-op 或系统亮度设置，不停止厂商首页，也不依赖 KANALI。停止仪表盘、数据超时退出或进程终止时窗口一起释放，固件恢复控制亮度。
+
+其他固件若不允许此窗口，渲染日志会记录 `Brightness control unavailable`，仪表盘仍尝试显示；不能因此保证该固件的实体屏幕可见。
+
 日常停止仍使用桌面开关或控制台。关闭后宿主会自行退出，驱动保持安装，以便下次启动。
 
 卸载：先停止仪表盘、取消其登录自启，然后以管理员 PowerShell 运行项目内 `scripts/uninstall_native.ps1`。它只移除本用户的传感器任务；没有其他用户任务引用时移除受保护的宿主目录。它保留 ProgramData 中的诊断/迁移备份，也不自动卸载可能被其他监控工具共用的 PawnIO。确定其他软件不使用时，可在 Windows“已安装的应用”中单独卸载 PawnIO。
@@ -60,3 +68,16 @@ CPU 温度优先取处理器的 Tctl/Tdie 或 Package 温度，CPU 功耗取 Pac
 Windows 11、Ryzen 7 9700X、MSI MPG X870I EDGE TI EVO WIFI：LHM 识别 Nuvoton NCT6687D-R，读取 CPU Tctl/Tdie、CPU Package 功耗与 CPU Fan。已在 KANALI 全部退出、使用 Google 官方 ADB 的状态下运行实体 PANORAMA SE 表盘。
 
 已测试软件数据通道中断后的重建、停止后传感器宿主退出、再次按需启动。软件模拟断线不等同于物理拔插或真实睡眠恢复；没有为了测试重启或休眠正在使用的电脑。
+
+
+## CPU 指标偶尔空白与采样频率
+
+温度、功耗和风扇超过 5 秒未更新时会显示 `—`，不会把旧值持续伪装为实时读数。v0.5.0 在本机曾复现 CPU 整体读取超过 8 秒，连带阻塞整轮快照。
+
+v0.5.1 对固定依赖 LHM 0.9.6 的 `Amd17Cpu` 使用封装级刷新，跳过仪表盘不用的每核心频率/性能计数器；CPU 总负载仍由 Windows/psutil 提供。适配器只在库版本及类型完全匹配时启用，通过反射调用库内封装刷新方法，不修改驱动或寄存器值。它仅输出实际刷新的温度及 Package 功耗，其他 CPU 继续走标准读取路径。上游实现见 [Amd17Cpu.cs](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/blob/v0.9.6/LibreHardwareMonitorLib/Hardware/Cpu/Amd17Cpu.cs)。升级 LHM 时必须重新验证此适配器。
+
+快照保留每类硬件读取耗时与单项采样时间；快照文件刚更新也不能让旧传感器读数重新变新。这改善已复现的停顿，不保证任何硬件/驱动环境永远不会短暂缺失。
+
+`sample_interval_s` 可设置为 `0.5`，使负载、内存、NVML 与传输计数更频繁地更新。CPU 温度、功耗和风扇仍按约 1 秒采集，以避免提高底层硬件访问频率；曲线保留 90 秒时间窗口。该配置是目标等待间隔，实际周期还包含读取耗时。
+
+已有 v0.5.0 安装需要先停止仪表盘，覆盖项目文件后重新运行 `setup-native.cmd` 更新受保护的传感器程序，再启动；仅更新 Python 文件不会更新已安装的传感器宿主。升级会复用已符合要求的 PawnIO 驱动。

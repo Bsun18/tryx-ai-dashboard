@@ -37,6 +37,8 @@ public class ScreenRenderer {
         System.out.println("AI_TELEMETRY_PORTABLE_SURFACE_READY pid="+android.os.Process.myPid());
         long started=SystemClock.elapsedRealtime();
         long duration=args.length>0?Long.parseLong(args[0]):0;
+        BrightnessWindow brightness = new BrightnessWindow();
+        brightness.start(context, args.length > 1 ? Integer.parseInt(args[1]) : 80);
         long end=duration>0?SystemClock.elapsedRealtime()+duration:Long.MAX_VALUE;
         try {
             while(SystemClock.elapsedRealtime()<end) {
@@ -49,6 +51,7 @@ public class ScreenRenderer {
             }
         } finally {
             host.running=false;
+            brightness.close();
             Object removal=tc.getConstructor().newInstance();
             tc.getMethod("remove",sc).invoke(removal,control);tc.getMethod("apply").invoke(removal);
             surface.release();

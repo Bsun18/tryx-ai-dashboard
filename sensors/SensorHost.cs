@@ -35,20 +35,45 @@ internal static class SensorHost
         catch (UnauthorizedAccessException) { return 0; }
     }
 
+    // LHM 0.9.6 exposes no public package-only refresh API. This adapter is
+    // restricted to its pinned AMD implementation and verified member shape.
+    // Other CPU implementations retain the ordinary Update path.
+    private static bool UpdateRequiredSensors(IHardware hardware)
+    {
+        Type type = hardware.GetType();
+        if (type.FullName != "LibreHardwareMonitor.Hardware.Cpu.Amd17Cpu" ||
+            type.Assembly.GetName().Version != new Version(0, 9, 6, 0))
+        {
+            hardware.Update();
+            return false;
+        }
+        var field = type.GetField("_processor", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        if (field == null) throw new MissingFieldException(type.FullName, "_processor");
+        object processor = field.GetValue(hardware);
+        var update = processor.GetType().GetMethod("UpdateSensors", Type.EmptyTypes);
+        if (update == null || update.ReturnType != typeof(void)) throw new MissingMethodException("AMD package UpdateSensors");
+        update.Invoke(processor, null);
+        return true;
+    }
+
     private static void Read(IHardware hardware, List<object> sensors, List<string> errors)
     {
         try
         {
-            hardware.Update();
+            ulong sampled = GetTickCount64();
+            bool packageOnly = UpdateRequiredSensors(hardware);
             foreach (ISensor sensor in hardware.Sensors)
             {
                 if (sensor.SensorType != SensorType.Temperature && sensor.SensorType != SensorType.Power &&
                     sensor.SensorType != SensorType.Fan && sensor.SensorType != SensorType.Load &&
                     sensor.SensorType != SensorType.Clock) continue;
+                // Do not export stale per-core load, clocks or power left from initialization.
+                if (packageOnly && sensor.SensorType != SensorType.Temperature &&
+                    !(sensor.SensorType == SensorType.Power && sensor.Name == "Package")) continue;
                 float? value = sensor.Value;
                 if (value.HasValue && (float.IsNaN(value.Value) || float.IsInfinity(value.Value))) value = null;
                 sensors.Add(new { id = sensor.Identifier.ToString(), name = sensor.Name,
-                    type = sensor.SensorType.ToString(), value = value,
+                    type = sensor.SensorType.ToString(), value = value, sample_tick_ms = sampled,
                     hardware_id = hardware.Identifier.ToString(), hardware_name = hardware.Name,
                     hardware_type = hardware.HardwareType.ToString() });
             }
@@ -107,14 +132,19 @@ internal static class SensorHost
                     if (now - started >= 30000 && (lastConsumer == 0 || now - lastConsumer >= 20000)) break;
                     var sensors = new List<object>();
                     var errors = new List<string>();
-                    foreach (IHardware hardware in computer.Hardware) Read(hardware, sensors, errors);
+                    var timings = new List<object>();
+                    foreach (IHardware hardware in computer.Hardware) {
+                        ulong began = GetTickCount64();
+                        Read(hardware, sensors, errors);
+                        timings.Add(new { hardware = hardware.HardwareType.ToString(), elapsed_ms = GetTickCount64() - began });
+                    }
                     try
                     {
                         Save("sensors.json", new { app = "TRYX-Native-Sensors", schema_version = 1,
                             tick_ms = GetTickCount64(), seq = sequence++, process_id = System.Diagnostics.Process.GetCurrentProcess().Id,
                             source = "LibreHardwareMonitor", library_version = typeof(Computer).Assembly.GetName().Version.ToString(),
                             driver_version = LibreHardwareMonitor.PawnIo.PawnIo.Version.ToString(), sensors = sensors,
-                            errors = errors, skipped_writes = skippedWrites });
+                            errors = errors, timings = timings, skipped_writes = skippedWrites, host_version = "0.5.1" });
                     }
                     catch (IOException) { skippedWrites++; }
                     Thread.Sleep(1000);

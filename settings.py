@@ -15,7 +15,8 @@ DEFAULTS = {'device_serial': None, 'adb_path': None, 'gpu_index': 0, 'disk_index
             'network_interface': None, 'gpu_label': None, 'cpu_label': None, 'storage_label': None,
             'storage_read_peak_mb_s': None, 'storage_write_peak_mb_s': None,
             'sensor_backend': 'native', 'cpu_hardware_id': None, 'cpu_temp_sensor_id': None,
-            'cpu_power_sensor_id': None, 'fan_sensor_id': None, 'native_gpu_hardware_id': None}
+            'cpu_power_sensor_id': None, 'fan_sensor_id': None, 'native_gpu_hardware_id': None,
+            'screen_brightness_percent': 80, 'sample_interval_s': 1}
 
 
 def load_config(path=None):
@@ -29,7 +30,14 @@ def load_config(path=None):
     result = dict(DEFAULTS, **supplied)
     if result['sensor_backend'] not in ('native', 'kanali'):
         raise ValueError('sensor_backend must be native or kanali')
+    brightness = result['screen_brightness_percent']
+    if isinstance(brightness, bool) or not isinstance(brightness, int) or not 1 <= brightness <= 100:
+        raise ValueError('screen_brightness_percent must be an integer from 1 to 100')
+    interval = result['sample_interval_s']
+    if isinstance(interval, bool) or not isinstance(interval, (int, float)) or not math.isfinite(interval) or not 0.5 <= interval <= 5:
+        raise ValueError('sample_interval_s must be a number from 0.5 to 5')
     for key, value in result.items():
+        if key in {'screen_brightness_percent', 'sample_interval_s'}: continue
         if value is None:
             if key == 'gpu_index': raise ValueError('gpu_index must be an integer')
             continue
