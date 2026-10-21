@@ -7,14 +7,14 @@ param(
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 $taskRoot = Split-Path -Parent $PSScriptRoot
-$taskShell = New-Object -ComObject WScript.Shell
+Add-Type -Path (Join-Path $PSScriptRoot 'ShortcutLink.cs')
 $taskStartup = Join-Path $StartupDirectory 'TRYX AI Dashboard.lnk'
 $taskLauncher = Join-Path $taskRoot 'launcher.py'
 $taskControl = Join-Path $taskRoot 'control_panel.py'
 
 function Test-OwnedShortcut([string]$Destination) {
     if (-not (Test-Path -LiteralPath $Destination)) { return $false }
-    $link = $taskShell.CreateShortcut($Destination)
+    $link = [DashboardShortcut]::Read($Destination)
     return ($link.TargetPath -eq $PythonPath -and
         ($link.Arguments.StartsWith('"' + $taskLauncher + '" ') -or $link.Arguments -eq ('"' + $taskControl + '"')))
 }
@@ -25,14 +25,8 @@ function Assert-Available([string]$Destination) {
 }
 function Write-Link([string]$Destination, [string]$Script, [string]$Arguments, [string]$Description) {
     Assert-Available $Destination
-    $link = $taskShell.CreateShortcut($Destination)
-    $link.TargetPath = $PythonPath
-    $link.Arguments = '"' + (Join-Path $taskRoot $Script) + '"' + $(if ($Arguments) { ' ' + $Arguments } else { '' })
-    $link.WorkingDirectory = $taskRoot
-    $link.WindowStyle = 7
-    $link.Description = $Description
-    $link.IconLocation = (Join-Path $taskRoot 'assets/dashboard.ico') + ',0'
-    $link.Save()
+    $commandArguments = '"' + (Join-Path $taskRoot $Script) + '"' + $(if ($Arguments) { ' ' + $Arguments } else { '' })
+    [DashboardShortcut]::Save($Destination, $PythonPath, $commandArguments, $taskRoot, $Description, (Join-Path $taskRoot 'assets/dashboard.ico'))
 }
 if ($Mode -eq 'Query') {
     $enabled = Test-OwnedShortcut $taskStartup

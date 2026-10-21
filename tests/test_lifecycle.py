@@ -85,7 +85,7 @@ class Lifecycle(unittest.TestCase):
     @unittest.skipUnless(os.name=='nt','Windows COM shortcuts')
     def test_shortcuts_use_this_installation_without_changing_real_startup(self):
         with tempfile.TemporaryDirectory() as directory:
-            desktop=Path(directory)/'Desktop'; startup=Path(directory)/'Startup'
+            desktop=Path(directory)/'Desktop-\u684c\u9762'; startup=Path(directory)/'Startup-\u542f\u52a8'
             desktop.mkdir(); startup.mkdir()
             pythonw=Path(sys.executable).with_name('pythonw.exe')
             def manage(mode):

@@ -6,13 +6,13 @@
 
 ![仪表盘设计示例（DEMO，非实时数据）](docs/images/dashboard-demo.png)
 
-> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.4.0**，新增桌面控制台、快捷开关和可选自启动。
+> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.4.1**，新增桌面控制台、快捷开关和可选自启动。
 
 ## 下载与部署
 
 **适用条件：** Windows 10/11、Python 3.10 或更新版本（推荐 3.12）、已安装且运行的 KANALI、通过 USB 正常连接的兼容屏幕。当前只接受设备型号 `cm01_se`、分辨率 `2240 × 1080`。实体测试覆盖 Windows 11 + 一台 PANORAMA SE；其他固件仍需验证。
 
-1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.4.0.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
+1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.4.1.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
 2. 从 [Python 官网](https://www.python.org/downloads/windows/) 安装 Python，安装时启用 **Add python.exe to PATH**。已安装者可跳过。
 3. 打开 KANALI，确认原厂屏幕正常工作。
 4. 双击 `setup.cmd`。它会创建项目独立的 Python 环境、安装依赖、识别屏幕和电脑硬件，并创建桌面入口。首次安装需要联网访问 PyPI。
