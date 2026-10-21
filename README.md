@@ -122,7 +122,7 @@
 - **提示找不到 ADB：** 优先使用项目 `tools/platform-tools/adb.exe`、`tools/adb.exe`、PATH 或 Android SDK 的 ADB；独立模式可运行 `setup-native.cmd` 安装官方 ADB。也可从 [Google 官方 Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 下载，接受其条款后解压到项目 `tools` 目录。不要从不明网站下载 DLL。
 - **未发现兼容屏幕：** 检查 USB 接线、设备驱动及固件，运行 `diagnose-screen.cmd` 查看只读报告。其他型号/分辨率会被拒绝，本版本不能保证兼容 PANORAMA 非 SE 或其他品牌屏幕。
 - **画面存在但黑屏或很暗：** v0.5.2 增加随渲染进程释放的系统亮度窗口，默认 80%，解决已验证固件首页的零亮度覆盖；无需额外授予普通悬浮窗权限。其他固件仍需验证，详见 [亮度说明](docs/native-mode.md#屏幕亮度)。
-- **温度、功耗或风扇显示 `—`：** 先完成 `setup-native.cmd`，检查 ProgramData 中的传感器快照是否更新。某些主板传感器可能不受支持，泛称风扇需手动匹配；见 [独立模式说明](docs/native-mode.md)。
+- **温度、功耗或风扇显示 `—`：** 先完成 `setup-native.cmd`（旧版升级也需重新运行），检查 ProgramData 中的传感器快照是否更新。某些主板传感器可能不受支持，泛称风扇需手动匹配；见 [独立模式说明](docs/native-mode.md)。
 - **AMD / Intel 显卡信息不完整：** 当前 NVIDIA 使用 NVML 完整采集路径，LHM 为其他 GPU 提供可用的部分指标，见 [兼容性说明](docs/compatibility.md)。
 - **提示端口 18765 被占用：** 先停止旧目录中的仪表盘，再启动新版本；同一台电脑一次运行一个实例。程序不会停止另一份安装目录的采集器。
 - **启动后显示等待：** 检查 `runtime/usb-status.json`；无设备、多设备歧义或不支持的型号会保留说明并持续等待，不会强行部署。
@@ -131,6 +131,8 @@
 - **想更换监控磁盘/网卡：** 修改本地配置后重启采集器。磁盘清单与型号在启动时读取，USB 网卡等新增设备也建议重启重新识别。
 
 ## 开发与验证
+
+v0.5.2 的独立传感器按硬件分开读取，并以普通优先级运行，减少本地 AI 忙碌时某个慢读取拖住全部温度/功耗数据的情况。过期值仍显示缺失。
 
 Windows 负责 Python 采集和本地 HTTP 服务（仅 `127.0.0.1:18765`），ADB USB 反向端口将数据交给屏幕上的 Android 原生 Canvas 渲染器。渲染器使用暂时的 SurfaceControl 叠加层，停止后原厂画面重新可见。
 
@@ -152,7 +154,7 @@ Windows sensors / NVML / native sensor host
 python scripts/build_renderer.py
 ```
 
-也可显式传入 `--java-home`、`--sdk-root`、`--platform android-30`、`--build-tools-dir`。编译产物只有 DEX 渲染代码，不包含 Android SDK、JDK 或厂商程序。独立传感器宿主在本机安装时编译。CI 验证 Python 3.10 / 3.12 的硬件无关逻辑；真实 USB、驱动和固件兼容性不能由 CI 代替。
+也可显式传入 `--java-home`、`--sdk-root`、`--platform android-30`、`--build-tools-dir`。编译产物只有 DEX 渲染代码，不包含 Android SDK、JDK 或厂商程序。独立传感器宿主在本机安装时编译。CI 验证 Python 3.10 / 3.12 的硬件无关逻辑，Windows 还会编译并运行不访问真实硬件的传感器线程隔离测试；真实 USB、驱动和固件兼容性不能由 CI 代替。
 
 ## 项目范围与依赖
 

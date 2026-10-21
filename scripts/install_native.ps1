@@ -89,6 +89,16 @@ try {
     $taskPrincipal = New-ScheduledTaskPrincipal -UserId $taskSid -LogonType Interactive -RunLevel Highest
     $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero)
     Register-ScheduledTask -TaskName $taskName -Action $taskAction -Principal $taskPrincipal -Settings $taskSettings -Description 'Read-only CPU/GPU/motherboard sensors for TRYX AI Dashboard. On demand; exits when the dashboard stops.' -Force | Out-Null
+    # Task Scheduler defaults to BelowNormal, which can starve pinned sensor
+    # reads during local inference. Use ordinary Normal priority, never High/Realtime.
+    [xml]$taskDefinition = Export-ScheduledTask -TaskName $taskName
+    $taskPriority = $taskDefinition.SelectSingleNode("//*[local-name()='Settings']/*[local-name()='Priority']")
+    if (-not $taskPriority) {
+        $taskPriority = $taskDefinition.CreateElement('Priority', $taskDefinition.DocumentElement.NamespaceURI)
+        [void]$taskDefinition.Task.Settings.AppendChild($taskPriority)
+    }
+    $taskPriority.InnerText = '4'
+    Register-ScheduledTask -TaskName $taskName -Xml $taskDefinition.OuterXml -Force | Out-Null
     Start-ScheduledTask -TaskName $taskName
     @{ok=$true; task=$taskName; host=$taskProgram} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskBuild 'install-result.json') -Encoding UTF8
 } catch {

@@ -20,3 +20,6 @@ jobs:
       - name: Compile native sensor host without installing a driver
         if: runner.os == 'Windows' && matrix.python == '3.12'
         run: python scripts/prepare_native.py
+      - name: Test sensor worker isolation without hardware
+        if: runner.os == 'Windows' && matrix.python == '3.12'
+        run: python scripts/test_sensor_workers.py

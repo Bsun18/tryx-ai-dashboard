@@ -81,3 +81,8 @@ v0.5.1 对固定依赖 LHM 0.9.6 的 `Amd17Cpu` 使用封装级刷新，跳过�
 `sample_interval_s` 可设置为 `0.5`，使负载、内存、NVML 与传输计数更频繁地更新。CPU 温度、功耗和风扇仍按约 1 秒采集，以避免提高底层硬件访问频率；曲线保留 90 秒时间窗口。该配置是目标等待间隔，实际周期还包含读取耗时。
 
 已有 v0.5.0 安装需要先停止仪表盘，覆盖项目文件后重新运行 `setup-native.cmd` 更新受保护的传感器程序，再启动；仅更新 Python 文件不会更新已安装的传感器宿主。升级会复用已符合要求的 PawnIO 驱动。
+
+
+v0.5.2 进一步将各类硬件读取隔离到独立线程，快照发布不等待慢设备。同一硬件始终只有一个读取线程；设备超过有效期只清空自己的读数。停止时会等待工作线程退出；若驱动调用仍未返回，宿主退出时由 Windows 回收进程资源，避免在正在读取时关闭硬件对象。
+
+任务调度器默认优先级 7 对应 BelowNormal；本机高负载下曾出现读取明显延迟。安装器现在显式使用优先级 4，即普通 Normal，未提高到 High 或 Realtime。对应关系见 [Microsoft TaskSettings.Priority](https://learn.microsoft.com/en-us/windows/win32/taskschd/tasksettings-priority)。升级 v0.5.2 同样需要重新运行 `setup-native.cmd`，以更新受保护宿主和任务设置。

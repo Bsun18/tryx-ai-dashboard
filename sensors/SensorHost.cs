@@ -82,6 +82,49 @@ internal static class SensorHost
         foreach (IHardware child in hardware.SubHardware) Read(child, sensors, errors);
     }
 
+    // Each top-level device owns one worker; no concurrent calls into the same device.
+    internal sealed class SensorWorker
+    {
+        private readonly object gate = new object();
+        private readonly ManualResetEvent stop;
+        private readonly Action<List<object>, List<string>> read;
+        private readonly Thread thread;
+        private List<object> sensors = new List<object>();
+        private List<string> errors = new List<string>();
+        private ulong sampled, elapsed;
+        internal readonly string Kind;
+        internal SensorWorker(string kind, ManualResetEvent stopEvent, Action<List<object>, List<string>> reader)
+        {
+            Kind = kind; stop = stopEvent; read = reader;
+            thread = new Thread(Loop) { IsBackground = true, Name = "Sensors " + kind };
+        }
+        internal void Start() { thread.Start(); }
+        internal bool Join(int timeout) { return thread.Join(timeout); }
+        private void Loop()
+        {
+            while (!stop.WaitOne(0))
+            {
+                ulong began = GetTickCount64();
+                var values = new List<object>(); var failures = new List<string>();
+                try { read(values, failures); }
+                catch (Exception error) { failures.Add(Kind + ": " + error.GetType().Name); }
+                lock (gate) { sensors = values; errors = failures; sampled = began; elapsed = GetTickCount64() - began; }
+                if (stop.WaitOne(1000)) break;
+            }
+        }
+        internal void Append(ulong now, List<object> values, List<string> failures, List<object> timings)
+        {
+            lock (gate)
+            {
+                bool fresh = sampled > 0 && now >= sampled && now - sampled < 5000;
+                if (fresh) values.AddRange(sensors);
+                failures.AddRange(errors);
+                timings.Add(new { hardware = Kind, elapsed_ms = elapsed,
+                    sample_age_ms = sampled > 0 && now >= sampled ? (ulong?)(now - sampled) : null, fresh = fresh });
+            }
+        }
+    }
+
     private static void Save(string name, object value)
     {
         string path = Path.Combine(OutputDirectory, name), temporary = path + ".tmp";
@@ -115,12 +158,21 @@ internal static class SensorHost
             var computer = new Computer { IsCpuEnabled = true, IsMotherboardEnabled = true,
                 IsGpuEnabled = true, IsMemoryEnabled = false, IsStorageEnabled = false,
                 IsNetworkEnabled = false, IsControllerEnabled = false };
+            var workers = new List<SensorWorker>();
+            var stopWorkers = new ManualResetEvent(false);
             try
             {
                 if (!Directory.Exists(OutputDirectory)) return 2;
                 if (!LibreHardwareMonitor.PawnIo.PawnIo.IsInstalled)
                     throw new InvalidOperationException("PawnIO is not installed.");
                 computer.Open();
+                foreach (IHardware hardware in computer.Hardware)
+                {
+                    IHardware device = hardware;
+                    var worker = new SensorWorker(device.HardwareType.ToString(), stopWorkers,
+                        delegate(List<object> values, List<string> failures) { Read(device, values, failures); });
+                    workers.Add(worker); worker.Start();
+                }
                 long sequence = 0;
                 ulong started = GetTickCount64();
                 ulong lastConsumer = 0;
@@ -133,18 +185,14 @@ internal static class SensorHost
                     var sensors = new List<object>();
                     var errors = new List<string>();
                     var timings = new List<object>();
-                    foreach (IHardware hardware in computer.Hardware) {
-                        ulong began = GetTickCount64();
-                        Read(hardware, sensors, errors);
-                        timings.Add(new { hardware = hardware.HardwareType.ToString(), elapsed_ms = GetTickCount64() - began });
-                    }
+                    foreach (SensorWorker worker in workers) worker.Append(GetTickCount64(), sensors, errors, timings);
                     try
                     {
                         Save("sensors.json", new { app = "TRYX-Native-Sensors", schema_version = 1,
                             tick_ms = GetTickCount64(), seq = sequence++, process_id = System.Diagnostics.Process.GetCurrentProcess().Id,
                             source = "LibreHardwareMonitor", library_version = typeof(Computer).Assembly.GetName().Version.ToString(),
                             driver_version = LibreHardwareMonitor.PawnIo.PawnIo.Version.ToString(), sensors = sensors,
-                            errors = errors, timings = timings, skipped_writes = skippedWrites, host_version = "0.5.1" });
+                            errors = errors, timings = timings, skipped_writes = skippedWrites, host_version = "0.5.2" });
                     }
                     catch (IOException) { skippedWrites++; }
                     Thread.Sleep(1000);
@@ -159,7 +207,12 @@ internal static class SensorHost
             }
             finally
             {
-                computer.Close();
+                stopWorkers.Set();
+                bool allStopped = true;
+                foreach (SensorWorker worker in workers) if (!worker.Join(500)) allStopped = false;
+                // Never close hardware under an in-flight driver call. Background workers
+                // terminate with the process and Windows releases its driver handles.
+                if (allStopped) { computer.Close(); stopWorkers.Dispose(); }
                 singleton.ReleaseMutex();
             }
         }
