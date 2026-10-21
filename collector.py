@@ -14,6 +14,7 @@ import uuid
 import psutil
 from settings import ROOT, RUNTIME, PORT, FLAGS, load_config, connect_screen, windows_inventory
 from telemetry_math import pcie_peak_mb_s, counter_rate, select_disk, short_label, storage_limits
+from native_sensors import native_loop, map_sensors, tick_ms
 
 CONFIG = load_config()
 ADB_BASE = []
@@ -25,8 +26,19 @@ snapshot = {}
 sampled_at = 0.0
 vendor = {}
 vendor_time = 0.0
+native_payload = {}
 processes = []
 STREAM_ID = uuid.uuid4().hex
+
+
+def publish_native(payload):
+    global native_payload
+    native_payload = payload
+
+
+def sensor_loop():
+    if CONFIG['sensor_backend'] == 'kanali': vendor_loop()
+    else: native_loop(stop, publish_native)
 
 def prepare():
     global INVENTORY, SELECTED_DISK
@@ -150,7 +162,7 @@ def sampler():
     storage_label = short_label(CONFIG.get('storage_label') or (disk or {}).get('model', '—'), 20)
     cpu_label = short_label(CONFIG.get('cpu_label') or INVENTORY.get('cpu', 'CPU'))
     gpus = INVENTORY.get('gpus', [])
-    fallback_gpu_label = short_label(CONFIG.get('gpu_label') or (gpus[0] if len(gpus)==1 else 'KANALI GPU'))
+    fallback_gpu_label = short_label(CONFIG.get('gpu_label') or (gpus[0] if len(gpus)==1 else 'GPU'))
     psutil.cpu_percent(None)
     prev_disks=psutil.disk_io_counters(perdisk=True,nowrap=False)
     prev_net=psutil.net_io_counters(pernic=True,nowrap=False)
@@ -179,8 +191,16 @@ def sampler():
             record['net_link_mbps']=stats[name].speed if name in stats and stats[name].isup and stats[name].speed>0 else None
             for key,field in [('net_rx_mb_s','bytes_recv'),('net_tx_mb_s','bytes_sent')]:
                 record[key]=counter_rate(net,prev_net,name,field,elapsed)
-            record['vendor_age_s']=round(now-vendor_time,2) if vendor_time else None
-            if vendor_time and now-vendor_time<5:
+            if CONFIG['sensor_backend'] == 'native':
+                readings = map_sensors(native_payload, CONFIG, tick_ms())
+                if gpu:
+                    readings = {k:v for k,v in readings.items() if not k.startswith('gpu_')}
+                elif 'gpu_label' in readings:
+                    readings['gpu_label'] = short_label(CONFIG.get('gpu_label') or readings['gpu_label'])
+                record.update(readings)
+            elif vendor_time and now-vendor_time<5:
+                record['cpu_source'] = 'KANALI'
+                record['vendor_age_s'] = max(0, round(now-vendor_time,2))
                 cpu=vendor.get('cpu',{});fans=vendor.get('fans',[])
                 record.update(cpu_temp_c=cpu.get('temperature'),cpu_power_w=cpu.get('power'))
                 if gpu is None:
@@ -248,7 +268,7 @@ def main():
     RUNTIME.mkdir(exist_ok=True)
     pid=RUNTIME/'collector.pid';pid.write_text(str(os.getpid()))
     prepare()
-    for target in [sampler,vendor_loop,usb_loop]:threading.Thread(target=target,daemon=True).start()
+    for target in [sampler,sensor_loop,usb_loop]:threading.Thread(target=target,daemon=True).start()
     print('AI Telemetry: USB device linked; loopback port',PORT,flush=True)
     try:server.serve_forever(poll_interval=.5)
     except KeyboardInterrupt:pass

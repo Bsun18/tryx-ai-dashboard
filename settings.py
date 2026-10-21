@@ -13,7 +13,9 @@ PORT = 18765
 FLAGS = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 DEFAULTS = {'device_serial': None, 'adb_path': None, 'gpu_index': 0, 'disk_index': None,
             'network_interface': None, 'gpu_label': None, 'cpu_label': None, 'storage_label': None,
-            'storage_read_peak_mb_s': None, 'storage_write_peak_mb_s': None}
+            'storage_read_peak_mb_s': None, 'storage_write_peak_mb_s': None,
+            'sensor_backend': 'native', 'cpu_hardware_id': None, 'cpu_temp_sensor_id': None,
+            'cpu_power_sensor_id': None, 'fan_sensor_id': None, 'native_gpu_hardware_id': None}
 
 
 def load_config(path=None):
@@ -25,6 +27,8 @@ def load_config(path=None):
     if unknown:
         raise ValueError('Unknown configuration keys: ' + ', '.join(sorted(unknown)))
     result = dict(DEFAULTS, **supplied)
+    if result['sensor_backend'] not in ('native', 'kanali'):
+        raise ValueError('sensor_backend must be native or kanali')
     for key, value in result.items():
         if value is None:
             if key == 'gpu_index': raise ValueError('gpu_index must be an integer')
@@ -62,7 +66,7 @@ def find_adb(config):
             except (OSError, subprocess.SubprocessError): pass
     # KANALI is already installed by the screen owner. Copy its local ADB runtime;
     # no vendor executable or DLL is distributed in this repository or release.
-    if not explicit:
+    if not explicit and config.get('sensor_backend') == 'kanali':
         for variable in ['ProgramFiles', 'ProgramFiles(x86)']:
             base = Path(os.environ.get(variable, 'C:/Program Files'))/'KANALI'
             files = [base/'bin'/'adb.exe', base/'AdbWinApi.dll', base/'AdbWinUsbApi.dll']
@@ -71,7 +75,7 @@ def find_adb(config):
                 for source in files: shutil.copy2(source, target/source.name)
                 if run_adb(target/'adb.exe', 'version', timeout=5).returncode == 0:
                     return str(target/'adb.exe')
-    raise FileNotFoundError('ADB not found. Install KANALI, add platform-tools to PATH, or set adb_path in config.json.')
+    raise FileNotFoundError('ADB not found. Run setup-native.cmd, add Google platform-tools to PATH, or set adb_path in config.json.')
 
 
 def parse_devices(output):

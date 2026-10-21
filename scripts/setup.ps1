@@ -30,9 +30,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Install the Tcl/Tk component of Python to use 
 & $taskPython -m pip install --only-binary=:all: -r (Join-Path $taskRoot 'requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check internet/PyPI access and retry.' }
 & $taskPython (Join-Path $taskRoot 'launcher.py') configure
-if ($LASTEXITCODE -ne 0) { throw 'Hardware configuration could not be completed; check the message above.' }
+$taskConfigured = $LASTEXITCODE -eq 0
+if (-not $taskConfigured) { Write-Host 'Python is ready. For independent operation run setup-native.cmd next; it installs official ADB and the sensor host.' }
 if (-not $NoShortcuts) {
     & $taskPython (Join-Path $taskRoot 'launcher.py') install-shortcuts
     if ($LASTEXITCODE -ne 0) { throw 'Could not install desktop shortcuts. You can still use control.cmd, start.cmd and stop.cmd.' }
 }
-Write-Host 'Setup complete. Open the desktop controller or control.cmd. Enable automatic startup there if desired.'
+Write-Host 'Python and desktop controls are ready. Run setup-native.cmd once to install independent sensors. Then open control.cmd and enable automatic startup there if desired.'

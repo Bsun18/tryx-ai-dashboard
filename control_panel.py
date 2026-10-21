@@ -84,8 +84,8 @@ class ControlPanel:
             if kind == 'state':
                 self.refreshing = False
                 self.state.set('仪表盘运行中' if value['live'] else '等待屏幕连接' if value['running'] else '仪表盘已关闭')
-                self.detail.set(('USB 已连接 · 实时数据正常' if value['cpu_temp_c'] is not None else '实时数据正常 · 等待 KANALI 温度数据')
-                                if value['live'] else 'USB 连接恢复后会自动显示。' if value['running'] else '当前显示 KANALI 原画面。')
+                self.detail.set(('USB 已连接 · 实时数据正常' if value['cpu_temp_c'] is not None else '实时数据正常 · 等待硬件传感器数据')
+                                if value['live'] else 'USB 连接恢复后会自动显示。' if value['running'] else '当前显示屏幕固件的原画面。')
                 if not self.busy: self.auto.set(value['autostart'])
             elif kind == 'state_error': self.refreshing = False
             else:

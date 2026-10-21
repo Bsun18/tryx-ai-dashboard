@@ -123,7 +123,7 @@ class CollectorPortability(unittest.TestCase):
                          physical_interfaces=['LAN 2'], default_interface='LAN 2')
         drives = {'PhysicalDrive7': NS(read_bytes=100, write_bytes=200)}
         net = {'LAN 2': NS(bytes_recv=100, bytes_sent=100)}
-        with patch.object(collector, 'CONFIG', dict(settings.DEFAULTS)), \
+        with patch.object(collector, 'CONFIG', dict(settings.DEFAULTS, sensor_backend='kanali')), \
              patch.object(collector, 'INVENTORY', inventory), patch.object(collector, 'SELECTED_DISK', disk), \
              patch.object(collector, 'Nvidia', side_effect=RuntimeError('test: unavailable')), \
              patch.object(collector, 'vendor_time', 99), patch.object(collector, 'time') as timing, \

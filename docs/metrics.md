@@ -4,17 +4,19 @@
 
 | 屏幕项 | 数据来源与含义 |
 | --- | --- |
-| GPU LOAD | NVML GPU 利用率；NVML 不可用时取 KANALI GPU load |
+| GPU LOAD | NVML GPU 利用率；NVML 不可用时取唯一选中 LHM GPU 的 Core load |
 | CPU LOAD | psutil 的全系统 CPU 使用率 |
-| TEMP | GPU 为 NVML / KANALI；CPU 为 KANALI；横条 0–100 °C 仅为显示刻度，不代表处理器安全上限 |
+| TEMP | GPU 为 NVML / LHM；CPU 为 LHM 的 Tctl/Tdie 或 Package；横条 0–100 °C 仅为显示刻度，不代表处理器安全上限 |
 | VRAM | NVML 已用 / 总显存，GiB；不是系统共享显存 |
 | MEM BUSY | NVML memory utilization，采样期间设备内存读写繁忙时间比例；不是显存容量占比，也不是显存 GB/s |
 | RAM | 总物理内存减可用内存 / 总量，GiB |
-| GPU POWER | NVML 功耗 / 当前功率限制；KANALI 回退只有可用功耗，限制未知时条形比例为空 |
-| CPU POWER / FAN | KANALI CPU 功耗和名为 CPU 的风扇转速；不假定最大瓦数或最大 RPM |
+| GPU POWER | NVML 功耗 / 当前功率限制；LHM 回退只有可用功耗，限制未知时条形比例为空 |
+| CPU POWER / FAN | LHM CPU Package 封装功耗与明确标记的 CPU 风扇转速；不假定最大瓦数或最大 RPM |
 | PCIe RX / TX | NVML 的设备接收 / 设备发送吞吐率，对应主机到 GPU / GPU 到主机 |
 | SSD READ / WRITE | psutil 选中 PhysicalDrive 的累计字节差 / 真实时间差，不按分区重复累加 |
 | NET RX / TX | psutil 选中网卡的收发字节差 / 时间差；包括该网卡的其他应用流量 |
+
+CPU 功耗的口径随采集库/硬件传感器而异；与旧版 KANALI 读数不同不代表整机功耗改变。源传感器 ID 会随快照返回，可查证选中的 CPU Package 与 CPU Fan。
 
 ## 单位
 
@@ -38,7 +40,7 @@ PCIe 为全双工，RX/TX **分别**除以单方向参照，不把两个方向�
 
 ## 缺失、重置与失效
 
-传感器缺失、分母未知或累计计数器回退时显示 `—`，不转换成 0。KANALI 传感器数据超过 5 秒不再使用。采集快照超过约 4 秒或 USB 连接失效时屏幕显示 `NO DATA`，停止沿用陈旧数值；渲染器约 15 秒没有新鲜数据时退出，释放叠加层。
+传感器缺失、分母未知或累计计数器回退时显示 `—`，不转换成 0。独立传感器快照超过 5 秒不再使用；显式旧版 KANALI 模式也保持 5 秒时效检查。采集快照超过约 4 秒或 USB 连接失效时屏幕显示 `NO DATA`，停止沿用陈旧数值；渲染器约 15 秒没有新鲜数据时退出，释放叠加层。
 
 NVML 在进程启动时初始化；驱动重置或硬件变更后建议重启仪表盘。存储、网卡和屏幕的自动选择依据本机状态，不承诺对所有固件、驱动或多显卡组合读取完全一致的指标。
 

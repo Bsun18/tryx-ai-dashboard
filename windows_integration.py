@@ -18,7 +18,7 @@ def powershell(script, *arguments, timeout=20):
 
 def manage_shortcuts(mode):
     if os.name!='nt': raise RuntimeError('Windows shortcuts require Windows.')
-    pythonw=Path(sys.executable).with_name('pythonw.exe')
+    pythonw=Path(sys.executable).with_name('pythonw.exe').resolve()
     if not pythonw.is_file(): raise FileNotFoundError('pythonw.exe is required; install the standard Windows Python distribution.')
     result=powershell('shortcuts.ps1','-Mode',mode,'-PythonPath',str(pythonw))
     if result.returncode: raise RuntimeError(result.stderr.strip() or result.stdout.strip())

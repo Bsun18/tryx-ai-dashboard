@@ -8,5 +8,11 @@
   "cpu_label": null,
   "storage_label": null,
   "storage_read_peak_mb_s": null,
-  "storage_write_peak_mb_s": null
+  "storage_write_peak_mb_s": null,
+  "sensor_backend": "native",
+  "cpu_hardware_id": null,
+  "cpu_temp_sensor_id": null,
+  "cpu_power_sensor_id": null,
+  "fan_sensor_id": null,
+  "native_gpu_hardware_id": null
 }

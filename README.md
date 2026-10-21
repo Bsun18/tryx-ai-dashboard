@@ -6,18 +6,18 @@
 
 ![仪表盘设计示例（DEMO，非实时数据）](docs/images/dashboard-demo.png)
 
-> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.4.1**，新增桌面控制台、快捷开关和可选自启动。
+> 图中是设计演示数据。运行时的型号、容量、网速和带宽参照值来自使用者自己的电脑。当前版本为 **v0.5.0**，默认独立采集，日常运行无需打开 KANALI；保留桌面开关与登录自启。
 
 ## 下载与部署
 
-**适用条件：** Windows 10/11、Python 3.10 或更新版本（推荐 3.12）、已安装且运行的 KANALI、通过 USB 正常连接的兼容屏幕。当前只接受设备型号 `cm01_se`、分辨率 `2240 × 1080`。实体测试覆盖 Windows 11 + 一台 PANORAMA SE；其他固件仍需验证。
+**适用条件：** Windows 10/11、Python 3.10 或更新版本（推荐 3.12）、64 位系统、.NET Framework 4.7.2+、通过 USB 正常连接的兼容屏幕。当前只接受设备型号 `cm01_se`、分辨率 `2240 × 1080`。实体测试覆盖 Windows 11 + 一台 PANORAMA SE；其他固件仍需验证。
 
-1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.4.1.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
+1. 从 [Releases](https://github.com/Bsun18/tryx-ai-dashboard/releases/latest) 下载 `tryx-ai-dashboard-v0.5.0.zip`，解压到有写入权限的本地文件夹。也可以使用 GitHub 的 **Code → Download ZIP**。
 2. 从 [Python 官网](https://www.python.org/downloads/windows/) 安装 Python，安装时启用 **Add python.exe to PATH**。已安装者可跳过。
-3. 打开 KANALI，确认原厂屏幕正常工作。
-4. 双击 `setup.cmd`。它会创建项目独立的 Python 环境、安装依赖、识别屏幕和电脑硬件，并创建桌面入口。首次安装需要联网访问 PyPI。
-5. 打开桌面的 **TRYX 仪表盘控制台**，点击“启动仪表盘”。也可运行 `control.cmd`。首次读取硬件可能需要约 10–65 秒。
-6. 要返回 KANALI 的画面，点击“关闭 · 返回原画面”。桌面 **TRYX 仪表盘开关** 可直接双击切换；原 `start.cmd` / `stop.cmd` 仍可使用。
+3. 确认屏幕 USB 接线和驱动正常。本机沿用已安装的 USB 设备驱动，尚未验证完全未装过厂商软件的全新系统。
+4. 双击 `setup.cmd` 准备 Python 环境和桌面入口，再运行 **`setup-native.cmd`**，同意一次管理员安装。它下载并校验官方 ADB、LibreHardwareMonitor 采集库和签名 PawnIO 驱动，安装按需传感器任务。详见 [独立模式安装说明](docs/native-mode.md)。
+5. 打开桌面的 **TRYX 仪表盘控制台**，点击“启动仪表盘”。也可运行 `control.cmd`。首次读取硬件可能需要约 10–65 秒；日常启动无需再次授权。
+6. 要返回屏幕固件的原画面，点击“关闭 · 返回原画面”。桌面 **TRYX 仪表盘开关** 可直接双击切换；原 `start.cmd` / `stop.cmd` 仍可使用。
 
 发布包已包含本项目编译的 `renderer/renderer.jar`，普通使用者**不需要安装 Java 或 Android SDK**。Python 需包含标准 Tcl/Tk 组件。项目不安装 APK、刷写固件或修改风扇曲线。
 
@@ -28,11 +28,11 @@
 - 关闭控制台窗口不影响仪表盘运行。
 - 手动关闭仪表盘后，本次登录不会被后台监督程序重新打开；仍勾选自启动时，下次登录会恢复。
 - USB 设备枚举较慢时采集器会等待并重试，不会因为开机时尚未发现屏幕而直接退出。
-- 已有且可访问的 `StartKANALI` 厂商任务会被复用；只有任务指向实际存在的 `KANALI.exe` 才会调用，不新增高权限任务。没有此任务时，请在 KANALI 自己的设置中启用自启动，或手动打开 KANALI。
+- 默认不启动 KANALI。普通权限采集器按需请求已安装的传感器任务；关闭仪表盘后，传感器宿主约 20–30 秒退出。高权限任务只执行 Program Files 中受保护的小程序。
 - 自启动项为当前用户启动文件夹中的 `TRYX AI Dashboard.lnk`。应用也会识别任务管理器中对它的禁用。
 - 升级建议解压到原项目目录并保留 `config.json`。若改用另一个目录，先在旧控制台取消自启动、停止旧实例并删除旧桌面快捷方式，再在新目录安装；不同目录不会互相接管快捷方式或进程。
 
-首次配置完成后不再需要联网下载依赖，运行时不上传遥测数据。保持 KANALI 运行，以提供 CPU 温度、功耗和风扇数据。安装位置变化、重装 Python 或迁移到另一台电脑时，应使用干净的发布包重新运行 `setup.cmd`，不要复制旧电脑的 `.venv` 和 `runtime`。
+首次配置完成后不再需要联网下载依赖，运行时不上传遥测数据。独立模式直接读取 CPU 温度、封装功耗和明确识别的 CPU 风扇转速。安装位置变化、重装 Python 或迁移到另一台电脑时，应使用干净的发布包重新运行 `setup.cmd`，不要复制旧电脑的 `.venv` 和 `runtime`。
 
 ## TRYX 其他屏幕能否使用
 
@@ -47,9 +47,9 @@
 | 项目 | 自动行为 |
 | --- | --- |
 | 屏幕 | 从 ADB 设备中识别 `cm01_se`，检查分辨率；忽略普通手机 |
-| CPU | 读取本机型号、总负载；温度与功耗取自 KANALI 新鲜传感器数据 |
+| CPU | 读取本机型号、总负载；温度与封装功耗取自独立 LibreHardwareMonitor / PawnIO 采集 |
 | GPU | 默认读取 NVML 的第 0 张 NVIDIA 显卡，包括型号、负载、显存、功耗及 PCIe 指标 |
-| 其他显卡 | NVML 不可用时，使用 KANALI 的 GPU 负载、温度、功耗；显存和 PCIe 等缺失项显示 `—` |
+| 其他显卡 | NVML 不可用时，LHM 可提供部分 GPU 指标；多卡时需指定 LHM 硬件 ID，缺失项显示 `—` |
 | 内存 | 读取实际 RAM 总容量、使用量与占比 |
 | SSD | 优先内置 NVMe，其次系统盘，再按磁盘编号选择；不写死 Disk 0 或某个型号 |
 | SSD 带宽 | 读取 NVMe 控制器报告的 PCIe 最大代际和通道数，计算单方向链路容量，标记 `LINK` |
@@ -73,7 +73,13 @@
   "cpu_label": null,
   "storage_label": null,
   "storage_read_peak_mb_s": null,
-  "storage_write_peak_mb_s": null
+  "storage_write_peak_mb_s": null,
+  "sensor_backend": "native",
+  "cpu_hardware_id": null,
+  "cpu_temp_sensor_id": null,
+  "cpu_power_sensor_id": null,
+  "fan_sensor_id": null,
+  "native_gpu_hardware_id": null
 }
 ```
 
@@ -81,20 +87,22 @@
 | --- | --- |
 | `device_serial` | 多台兼容屏幕时，指定目标 ADB 序列号；仅保存在本地 |
 | `adb_path` | 指定自己的 `adb.exe` 完整路径，例如 `D:/Android/platform-tools/adb.exe` |
-| `gpu_index` | NVIDIA NVML 显卡索引，从 0 开始；不控制 KANALI 的 GPU 选择 |
+| `gpu_index` | NVIDIA NVML 显卡索引，从 0 开始；与 LHM 硬件 ID 不同 |
 | `disk_index` | Windows 物理磁盘编号，如 2；显式选择不存在的磁盘时显示缺失，不改选其他磁盘 |
 | `network_interface` | Windows 网卡名称；指定网卡断开时显示缺失，不自动切换 |
 | `*_label` | 自定义屏幕短名称，过长会截断；不改变被采集的硬件 |
 | `storage_*_peak_mb_s` | 可选的 SSD 读/写参照速度，十进制 MB/s；设置后标记 `REF`，未设置的方向保持未知 |
 
-硬件清单保存在本地 `runtime/hardware.json`，用于确认选中的磁盘编号和网卡名称。它与 `config.json`、日志和设备序列号均被版本控制忽略，不包含在官方发布包里。多显卡电脑使用 KANALI 回退时，其 GPU 选择由 KANALI 决定；程序不能保证对应 `gpu_index`。
+`sensor_backend` 默认为 `native`；显式改为 `kanali` 才使用旧版厂商数据源。其余传感器选择项见 [独立模式说明](docs/native-mode.md#指标选择)。
+
+硬件清单保存在本地 `runtime/hardware.json`，用于确认选中的磁盘编号和网卡名称。它与 `config.json`、日志和设备序列号均被版本控制忽略，不包含在官方发布包里。多 GPU 无法唯一匹配时保留未知，避免混用不同显卡的读数。
 
 ## 常见问题
 
-- **提示找不到 ADB：** 优先使用项目 `tools/platform-tools/adb.exe`、`tools/adb.exe`、PATH 或 Android SDK 的 ADB；也会尝试复用默认安装目录中的 KANALI ADB。非默认 KANALI 安装位置可通过 `adb_path` 指定。仍找不到时，从 [Google 官方 Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 下载，接受其条款后解压到项目 `tools` 目录。不要从不明网站下载 DLL。
-- **未发现兼容屏幕：** 检查 KANALI 是否识别设备、USB 接线、驱动及固件。其他型号/分辨率会被拒绝，本版本不能保证兼容 PANORAMA 非 SE 或其他品牌屏幕。
-- **温度、功耗或风扇显示 `—`：** KANALI 未持续提供对应传感器数据，或固件日志格式与已测试版本不同。保持 KANALI 运行；程序不安装额外传感器驱动。
-- **AMD / Intel 显卡信息不完整：** 当前只为 NVIDIA 实现了 NVML 完整采集路径。KANALI 回退为部分支持，见 [兼容性说明](docs/compatibility.md)。
+- **提示找不到 ADB：** 优先使用项目 `tools/platform-tools/adb.exe`、`tools/adb.exe`、PATH 或 Android SDK 的 ADB；独立模式可运行 `setup-native.cmd` 安装官方 ADB。也可从 [Google 官方 Platform-Tools](https://developer.android.com/tools/releases/platform-tools) 下载，接受其条款后解压到项目 `tools` 目录。不要从不明网站下载 DLL。
+- **未发现兼容屏幕：** 检查 USB 接线、设备驱动及固件，运行 `diagnose-screen.cmd` 查看只读报告。其他型号/分辨率会被拒绝，本版本不能保证兼容 PANORAMA 非 SE 或其他品牌屏幕。
+- **温度、功耗或风扇显示 `—`：** 先完成 `setup-native.cmd`，检查 ProgramData 中的传感器快照是否更新。某些主板传感器可能不受支持，泛称风扇需手动匹配；见 [独立模式说明](docs/native-mode.md)。
+- **AMD / Intel 显卡信息不完整：** 当前 NVIDIA 使用 NVML 完整采集路径，LHM 为其他 GPU 提供可用的部分指标，见 [兼容性说明](docs/compatibility.md)。
 - **提示端口 18765 被占用：** 先停止旧目录中的仪表盘，再启动新版本；同一台电脑一次运行一个实例。程序不会停止另一份安装目录的采集器。
 - **启动后显示等待：** 检查 `runtime/usb-status.json`；无设备、多设备歧义或不支持的型号会保留说明并持续等待，不会强行部署。
 - **启动未确认：** 查看 `runtime/launcher-error.log`、`runtime/collector.log` 和 `runtime/renderer.log`。控制台错误另见 `runtime/control-error.log`。日志可能包含本机信息，提交 issue 前先检查并删去序列号、用户名及路径。
@@ -106,7 +114,7 @@
 Windows 负责 Python 采集和本地 HTTP 服务（仅 `127.0.0.1:18765`），ADB USB 反向端口将数据交给屏幕上的 Android 原生 Canvas 渲染器。渲染器使用暂时的 SurfaceControl 叠加层，停止后原厂画面重新可见。
 
 ```text
-Windows sensors / NVML / KANALI
+Windows sensors / NVML / native sensor host
             → Python collector → loopback HTTP
             → ADB USB reverse → Android Canvas → cooler screen
 ```
@@ -123,7 +131,7 @@ Windows sensors / NVML / KANALI
 python scripts/build_renderer.py
 ```
 
-也可显式传入 `--java-home`、`--sdk-root`、`--platform android-30`、`--build-tools-dir`。编译产物只有 DEX 渲染代码，不包含 Android SDK、JDK 或厂商程序。CI 验证 Python 3.10 / 3.12 的硬件无关逻辑；真实 USB、驱动和固件兼容性不能由 CI 代替。
+也可显式传入 `--java-home`、`--sdk-root`、`--platform android-30`、`--build-tools-dir`。编译产物只有 DEX 渲染代码，不包含 Android SDK、JDK 或厂商程序。独立传感器宿主在本机安装时编译。CI 验证 Python 3.10 / 3.12 的硬件无关逻辑；真实 USB、驱动和固件兼容性不能由 CI 代替。
 
 ## 项目范围与依赖
 

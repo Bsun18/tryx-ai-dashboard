@@ -13,6 +13,7 @@ import psutil
 from settings import ROOT, RUNTIME, PORT, FLAGS, connect_screen, find_adb, load_config, run_adb, windows_inventory
 from telemetry_math import select_disk, storage_limits
 from windows_integration import action_lock, autostart_enabled, ensure_kanali, manage_shortcuts
+from native_sensors import release_lease
 
 
 def current():
@@ -73,7 +74,7 @@ def start():
             process = subprocess.Popen([str(executable), str(ROOT/'collector.py')], cwd=ROOT, stdin=subprocess.DEVNULL,
                              stdout=log, stderr=subprocess.STDOUT, creationflags=FLAGS | subprocess.CREATE_NEW_PROCESS_GROUP)
         (RUNTIME/'collector.pid').write_text(str(process.pid),encoding='ascii')
-    ensure_kanali()
+    if load_config()['sensor_backend'] == 'kanali': ensure_kanali()
     deadline = time.monotonic() + 65
     while time.monotonic() < deadline:
         time.sleep(.5)
@@ -107,6 +108,7 @@ def stop_dashboard():
     for child in alive:
         try: child.kill()
         except psutil.Error: pass
+    release_lease()
     serial = connection.get('serial')
     if serial:
         try:
@@ -146,10 +148,18 @@ def perform(command):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['configure','start','stop','toggle','autostart','status','install-shortcuts','enable-autostart','disable-autostart'], nargs='?', default='start')
+    parser.add_argument('command', choices=['configure','start','stop','toggle','autostart','status','use-native','install-shortcuts','enable-autostart','disable-autostart'], nargs='?', default='start')
     args = parser.parse_args()
     if os.name != 'nt': raise RuntimeError('The collector requires Windows 10/11.')
     if args.command == 'configure': configure()
+    elif args.command == 'use-native':
+        with action_lock():
+            if current(): raise RuntimeError('Stop this dashboard before changing its sensor backend.')
+            config = load_config()
+            config['sensor_backend'] = 'native'
+            config['adb_path'] = None
+            (ROOT/'config.json').write_text(json.dumps(config,ensure_ascii=False,indent=2),encoding='utf-8')
+        print('Native sensors enabled. KANALI will not be started by this dashboard.')
     elif args.command in {'start','stop','toggle','autostart'}:
         result=perform(args.command)
         if sys.stdout: print(result)
