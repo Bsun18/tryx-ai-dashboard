@@ -235,6 +235,8 @@ def usb_loop():
                 executable, serial = connect_screen(CONFIG)
                 ADB_BASE = [executable, '-s', serial]
                 (RUNTIME/'connection.json').write_text(json.dumps({'serial':serial}),encoding='utf-8')
+            ready=adb('start-server',timeout=30)
+            if ready.returncode: raise RuntimeError(ready.stderr.strip() or 'USB service startup failed')
             state=adb('get-state',timeout=5)
             if state.returncode==0 and state.stdout.strip()=='device':
                 # The loopback port is exclusively owned by this collector. Clear
@@ -254,7 +256,9 @@ def usb_loop():
                         with (RUNTIME/'renderer.log').open('w',encoding='utf-8') as log:
                             renderer=subprocess.Popen(ADB_BASE+['shell','CLASSPATH=/data/local/tmp/ai-telemetry.jar app_process / --nice-name=ai-telemetry local.aimonitor.dashboard.ScreenRenderer 0 '+str(max(1,min(100,int(CONFIG.get('screen_brightness_percent',80)))))],stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,creationflags=FLAGS)
                         processes.append(renderer)
-                (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':True,'message':''}),encoding='utf-8')
+                screen=bool(adb('shell','pidof','ai-telemetry',timeout=5).stdout.strip())
+                (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':True,'screen':screen,
+                    'collector_pid':os.getpid(),'checked_at':time.monotonic(),'message':''}),encoding='utf-8')
             else:
                 (RUNTIME/'usb-status.json').write_text(json.dumps({'connected':False,'message':'Waiting for the selected USB screen.'}),encoding='utf-8')
         except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:

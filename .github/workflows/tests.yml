@@ -16,7 +16,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
-      - run: python -m compileall -q collector.py launcher.py settings.py telemetry_math.py windows_integration.py control_panel.py diagnose_screen.py native_sensors.py scripts
+      - run: python -m compileall -q collector.py launcher.py background.py settings.py telemetry_math.py windows_integration.py control_panel.py diagnose_screen.py native_sensors.py scripts
       - name: Compile native sensor host without installing a driver
         if: runner.os == 'Windows' && matrix.python == '3.12'
         run: python scripts/prepare_native.py

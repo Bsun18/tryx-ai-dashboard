@@ -12,9 +12,39 @@ import collector
 import diagnose_screen
 import launcher
 import windows_integration
+import background
 
 
 class Lifecycle(unittest.TestCase):
+    def test_failed_background_start_stops_its_hung_task_before_retry(self):
+        with patch.object(background,'manage_task') as task, \
+             patch.object(background.time,'monotonic',side_effect=[0,16]):
+            with self.assertRaisesRegex(RuntimeError,'did not start'):
+                background.launch(Path('example'),lambda:None)
+            self.assertEqual(task.call_args_list[-1].args,(Path('example'),'Stop'))
+
+    def test_status_uses_only_fresh_owned_usb_report_without_starting_adb(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(launcher,'RUNTIME',Path(directory)), \
+             patch.object(launcher,'current',return_value=NS(pid=100)), \
+             patch.object(launcher,'metrics',return_value={'collector_pid':100,'sample_age_s':0}), \
+             patch.object(launcher,'autostart_enabled',return_value=False), \
+             patch.object(launcher.time,'monotonic',return_value=100), patch.object(launcher,'run_adb') as adb:
+            for pid, checked, expected in [(100,99,True),(101,99,False),(100,60,False),(100,101,False)]:
+                (Path(directory)/'usb-status.json').write_text(json.dumps(
+                    {'collector_pid':pid,'checked_at':checked,'screen':True}),encoding='utf-8')
+                self.assertEqual(launcher.status()['live'],expected)
+            adb.assert_not_called()
+
+    def test_failed_daemon_start_does_not_run_short_usb_commands(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(collector,'RUNTIME',Path(directory)), \
+             patch.object(collector,'ADB_BASE',['adb','-s','EXAMPLE']), patch.object(collector,'processes',[]), \
+             patch.object(collector,'adb',return_value=NS(returncode=1,stderr='service not ready')) as adb, \
+             patch.object(collector,'stop') as stopped:
+            stopped.is_set.side_effect=[False,True]
+            collector.usb_loop()
+            adb.assert_called_once_with('start-server',timeout=30)
+            self.assertFalse(json.loads((Path(directory)/'usb-status.json').read_text())['connected'])
+
     def test_usb_discovery_retries_then_starts_only_validated_target(self):
         commands=[]
         def fake_adb(*args, **kwargs):

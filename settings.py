@@ -105,6 +105,8 @@ def choose_screen(devices, serial=None):
 
 def connect_screen(config):
     adb = find_adb(config)
+    ready = run_adb(adb, 'start-server', timeout=30)
+    if ready.returncode: raise RuntimeError(ready.stderr.strip() or 'USB service startup failed')
     result = run_adb(adb, 'devices', '-l')
     if result.returncode: raise RuntimeError(result.stderr.strip() or 'ADB device discovery failed')
     selected = choose_screen(parse_devices(result.stdout), config.get('device_serial'))

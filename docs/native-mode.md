@@ -86,3 +86,16 @@ v0.5.1 对固定依赖 LHM 0.9.6 的 `Amd17Cpu` 使用封装级刷新，跳过�
 v0.5.2 进一步将各类硬件读取隔离到独立线程，快照发布不等待慢设备。同一硬件始终只有一个读取线程；设备超过有效期只清空自己的读数。停止时会等待工作线程退出；若驱动调用仍未返回，宿主退出时由 Windows 回收进程资源，避免在正在读取时关闭硬件对象。
 
 任务调度器默认优先级 7 对应 BelowNormal；本机高负载下曾出现读取明显延迟。安装器现在显式使用优先级 4，即普通 Normal，未提高到 High 或 Realtime。对应关系见 [Microsoft TaskSettings.Priority](https://learn.microsoft.com/en-us/windows/win32/taskschd/tasksettings-priority)。升级 v0.5.2 同样需要重新运行 `setup-native.cmd`，以更新受保护宿主和任务设置。
+
+
+## 独立后台启动（v0.5.3）
+
+普通采集器通过 Windows Task Scheduler 的当前用户 `InteractiveToken / RunLevel LUA` 按需任务启动，独立于控制台或调用它的终端。它与需管理员权限的传感器任务分开，不存储密码、不创建定时触发器；登录自启仍由控制台现有的用户启动项控制。[Microsoft 任务安全上下文](https://learn.microsoft.com/en-us/windows/win32/taskschd/security-contexts-for-running-tasks)。
+
+每个项目目录有自己的 `TRYX Dashboard-<SID>-<目录散列>` 任务。重复启动不会创建第二个实例。任务运行项目自己的 `background.py`，由它记录日志并运行采集器；手动停止采集器后任务退出，不会自行重启。升级时保留目录和 Python 环境；搬迁前先停止并清理旧任务。
+
+完整卸载前，停止仪表盘、取消登录自启，在项目目录执行 `.venv\Scripts\python.exe launcher.py remove-background-task`，删除本目录的普通后台任务，再按上文移除传感器宿主。桌面快捷方式可手动删除。这个命令只匹配当前用户和当前目录，运行中的任务拒绝删除。
+
+曾复现关闭发起启动的客户端后，ADB 服务消失，而控制台以 3 秒短超时检查状态，打断约 5 秒的服务冷启动，导致采集器仍工作、屏幕却无法恢复。现在只有 USB 工作线程建立连接，先给 `start-server` 最多 30 秒；控制台只读 `runtime/usb-status.json` 的当前进程报告，过期信息不会显示为已连接。失败详情见 `runtime/launcher-error.log`、`runtime/collector.log`、`runtime/background-error.log` 和 `runtime/usb-status.json`。
+
+本机已通过模拟客户端整个 Windows Job 被强制终止后的持续运行测试；这不替代每台电脑实际退出客户端、重启和休眠验证。若任务创建被组织策略禁止，程序会明确报错，不会静默退回依赖父进程的启动方式。Python 应安装在独立的用户或系统目录，勿依赖其他应用的缓存运行时。

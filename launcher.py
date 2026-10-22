@@ -14,6 +14,7 @@ from settings import ROOT, RUNTIME, PORT, FLAGS, connect_screen, find_adb, load_
 from telemetry_math import select_disk, storage_limits
 from windows_integration import action_lock, autostart_enabled, ensure_kanali, manage_shortcuts
 from native_sensors import release_lease
+from background import launch as launch_background, manage_task
 
 
 def current():
@@ -68,12 +69,7 @@ def start():
         (RUNTIME/'renderer.log').write_text('', encoding='utf-8')
         for name in ['connection.json','usb-status.json']:
             (RUNTIME/name).unlink(missing_ok=True)
-        executable = Path(sys.executable).with_name('pythonw.exe')
-        if not executable.exists(): executable = Path(sys.executable)
-        with (RUNTIME/'collector.log').open('w', encoding='utf-8') as log:
-            process = subprocess.Popen([str(executable), str(ROOT/'collector.py')], cwd=ROOT, stdin=subprocess.DEVNULL,
-                             stdout=log, stderr=subprocess.STDOUT, creationflags=FLAGS | subprocess.CREATE_NEW_PROCESS_GROUP)
-        (RUNTIME/'collector.pid').write_text(str(process.pid),encoding='ascii')
+        process = launch_background(ROOT, current)
     if load_config()['sensor_backend'] == 'kanali': ensure_kanali()
     deadline = time.monotonic() + 65
     while time.monotonic() < deadline:
@@ -132,9 +128,10 @@ def status():
     screen=False
     if owned:
         try:
-            connection=json.loads((RUNTIME/'connection.json').read_text(encoding='utf-8'))
-            screen=bool(run_adb(find_adb(load_config()),'-s',connection['serial'],'shell','pidof','ai-telemetry',timeout=3).stdout.strip())
-        except (OSError,ValueError,KeyError,subprocess.SubprocessError): pass
+            usb=json.loads((RUNTIME/'usb-status.json').read_text(encoding='utf-8'))
+            screen=bool(usb.get('collector_pid')==process.pid and usb.get('screen') and
+                        0 <= time.monotonic()-usb.get('checked_at',0) < 25)
+        except (OSError,ValueError,TypeError): pass
     return {'running':bool(process),'live':bool(owned and screen and isinstance(age,(int,float)) and age<4),
             'screen':screen,'sample_age_s':age,'cpu_temp_c':data.get('cpu_temp_c') if owned else None,
             'autostart':autostart_enabled()}
@@ -148,10 +145,15 @@ def perform(command):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['configure','start','stop','toggle','autostart','status','use-native','install-shortcuts','enable-autostart','disable-autostart'], nargs='?', default='start')
+    parser.add_argument('command', choices=['configure','start','stop','toggle','autostart','status','use-native','install-shortcuts','enable-autostart','disable-autostart','remove-background-task'], nargs='?', default='start')
     args = parser.parse_args()
     if os.name != 'nt': raise RuntimeError('The collector requires Windows 10/11.')
     if args.command == 'configure': configure()
+    elif args.command == 'remove-background-task':
+        with action_lock():
+            if current(): raise RuntimeError('Stop the dashboard before removing its background task.')
+            result=manage_task(ROOT,'Remove')
+        if sys.stdout: print(result)
     elif args.command == 'use-native':
         with action_lock():
             if current(): raise RuntimeError('Stop this dashboard before changing its sensor backend.')

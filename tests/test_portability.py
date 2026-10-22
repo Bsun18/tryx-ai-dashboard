@@ -113,7 +113,7 @@ class Configuration(unittest.TestCase):
         with self.assertRaises(RuntimeError): settings.choose_screen(devices, 'ABSENT')
 
     def test_explicit_phone_is_still_rejected_by_hardware_validation(self):
-        results = [NS(returncode=0, stdout='PHONE device model:Pixel', stderr=''),
+        results = [NS(returncode=0, stdout='', stderr=''), NS(returncode=0, stdout='PHONE device model:Pixel', stderr=''),
                    NS(stdout='Pixel'), NS(stdout='Physical size: 2240x1080')]
         with patch.object(settings, 'find_adb', return_value='adb'), patch.object(settings, 'run_adb', side_effect=results):
             with self.assertRaises(RuntimeError): settings.connect_screen({'device_serial': 'PHONE'})
